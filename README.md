@@ -1,14 +1,14 @@
 # agent-retro
 
-> **Compatibility: Claude Code and OpenAI Codex.** The extractor auto-detects both JSONL transcript formats.
+> **Codex-first.** Agent Retro is designed, tested, and automated for OpenAI Codex. Claude Code JSONL is accepted as an import format, but Claude Code is not the primary runtime or product target.
 
-A session retrospective skill for AI coding agents. Invoke `agent-retro` (or ask for a session retrospective) to analyze what happened, identify friction, and get concrete suggestions for improving your skills, rules, and workflows.
+A local-first Codex application and skill for session retrospectives. Invoke `agent-retro` (or ask Codex for a session retrospective) to analyze what happened, identify friction, and get concrete suggestions for improving your skills, rules, and workflows.
 
 Follows the [Agent Skills](https://agentskills.io) open standard.
 
 ## What it does
 
-`/agent-retro` reads your session transcript from disk and produces a structured analysis:
+Agent Retro reads local Codex sessions, plus imported compatible Claude Code transcripts, and produces a structured analysis:
 
 - **Full conversation arc** — every user message and assistant response, in order. No sampling, no skipping.
 - **Token cost breakdown** — per-agent attribution so you can see where the budget went.
