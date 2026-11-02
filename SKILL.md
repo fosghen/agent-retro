@@ -80,7 +80,7 @@ The JSONL records cache-aware token usage:
 - `cache_read_input_tokens`: cache hits (charged at 0.1x input rate — this is usually the biggest number)
 - `output_tokens`: generated tokens (most expensive per-token)
 
-The script computes estimated USD cost using Opus pricing. For sessions with subagents, the subagent cost is separate and additive.
+The script estimates USD cost only for Claude sessions using the documented Opus pricing table. Codex token counts are preserved, but cost remains `null` because local transcripts do not establish billing.
 
 ### If extraction fails
 
@@ -106,7 +106,7 @@ What did this session actually produce? List all that apply.
 | Bug fix | Commits with "fix" prefix, debugging patterns |
 | Communication | Slack/email MCP calls, PR comments |
 | Local files | Writes to non-code files (plans, notes, docs) |
-| Setup changes | Edits to config, CLAUDE.md, settings, skills |
+| Setup changes | Edits to config, CLAUDE.md, AGENTS.md, settings, skills |
 | Spec / Design | Plan files, design discussion, no implementation |
 | Process improvement | Rule updates, workflow changes, skill creation |
 | Review | PR review calls, code-review agents |
@@ -139,7 +139,7 @@ Read the conversation arc. Look for these patterns in user messages:
 For each friction point, trace the causal chain:
 
 ```
-User correction -> What did Claude do wrong -> Why did Claude do that ->
+User correction -> What did the agent do wrong -> Why did it do that ->
 Was it a wrong assumption? Missing context? Bad skill guidance? Wrong tool?
 ```
 
@@ -155,7 +155,7 @@ Was it a wrong assumption? Missing context? Bad skill guidance? Wrong tool?
 
 **Over-engineering**: More tool calls or agent dispatches than the task warranted. Root cause: did a skill push Claude toward a heavyweight process when something simpler would have worked?
 
-**Under-specification**: Claude asked clarifying questions the user shouldn't have needed to answer (information was available in files, context, or memory). Root cause: missing research step? Skill didn't tell Claude where to look?
+**Under-specification**: The agent asked clarifying questions the user shouldn't have needed to answer (information was available in files, context, or memory). Root cause: missing research step? Skill didn't tell the agent where to look?
 
 ### For skill-development retros
 
@@ -180,7 +180,7 @@ For every issue from Step 5, propose a concrete action:
 |---|---|---|
 | `skill-update` | Edit an existing skill | The specific text to change and why |
 | `skill-create` | New skill needed | What it would do and when it triggers |
-| `rule-update` | Edit CLAUDE.md or rules/ | The rule text and which file |
+| `rule-update` | Edit CLAUDE.md, AGENTS.md, or rules/ | The rule text and which file |
 | `rule-create` | New rule file | The rule content |
 | `setup-change` | Config, hooks, tools | What to change and where |
 | `memory-update` | Save to auto-memory | The fact to remember |
