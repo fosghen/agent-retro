@@ -135,8 +135,15 @@ Contributions welcome — if you know where another agent stores its session dat
 
 ## Requirements
 
-- Python 3.8+ (stdlib only, no dependencies)
+- Python 3.12 and `uv` for development and installation
 - Tested transcript formats: Claude Code v2.1.59+ and current Codex rollout JSONL
+
+Install the locked environment and verify the CLI:
+
+```bash
+uv sync --locked --all-groups
+uv run agent-retro --help
+```
 
 ## License
 
