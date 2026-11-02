@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import argparse
+import subprocess
+import sys
+
 MAX_LINES = 50
 MAX_COMMITS = 5
 
@@ -31,3 +35,32 @@ def check(branch: str, commits: dict[str, str]) -> None:
         lines = count_lines(numstat)
         if lines > MAX_LINES:
             raise ChangeLimitError(f"commit {commit} has {lines} changed lines; maximum is 50")
+
+
+def git(*args: str) -> str:
+    """Run Git and return stripped standard output."""
+    result = subprocess.run(["git", *args], check=True, capture_output=True, text=True)
+    return result.stdout.strip()
+
+
+def main() -> int:
+    """Check either the staged commit or a base-to-head range."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--range", nargs=2, metavar=("BASE", "HEAD"))
+    args = parser.parse_args()
+    branch = git("branch", "--show-current")
+    if args.range:
+        hashes = git("rev-list", "--reverse", f"{args.range[0]}..{args.range[1]}").splitlines()
+        commits = {item: git("show", "--format=", "--numstat", item) for item in hashes}
+    else:
+        commits = {"staged": git("diff", "--cached", "--numstat")}
+    try:
+        check(branch, commits)
+    except ChangeLimitError as error:
+        print(f"change policy failed: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
