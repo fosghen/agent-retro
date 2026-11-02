@@ -81,6 +81,14 @@ def _json_object(value):
     return parsed if isinstance(parsed, dict) else {}
 
 
+def _is_injected_user_text(text):
+    return text.lstrip().startswith((
+        "<system-reminder>",
+        "<environment_context>",
+        "# AGENTS.md instructions for ",
+    ))
+
+
 def _codex_tool_use(payload):
     """Normalize Codex custom and function tool calls."""
     name = payload.get("name", "unknown")
@@ -114,6 +122,23 @@ def _normalize_codex_record(record):
             "cwd": payload.get("cwd"),
             "version": payload.get("cli_version"),
             "timestamp": timestamp or payload.get("timestamp"),
+        }
+    if record.get("type") == "token_usage_record":
+        usage = payload.get("usage") or {}
+        cached = usage.get("cached_input_tokens", 0) or 0
+        total_input = usage.get("input_tokens", 0) or 0
+        return {
+            "timestamp": timestamp,
+            "message": {
+                "role": "assistant",
+                "content": [],
+                "usage": {
+                    "input_tokens": max(0, total_input - cached),
+                    "output_tokens": usage.get("output_tokens", 0) or 0,
+                    "cache_creation_input_tokens": 0,
+                    "cache_read_input_tokens": cached,
+                },
+            },
         }
     if record.get("type") != "response_item":
         return {"timestamp": timestamp}
@@ -188,10 +213,69 @@ def extract_json_field(text, key):
     return None
 
 
+def _jsonl_records(text):
+    """Parse complete JSONL records from a bounded text buffer."""
+    for line in text.splitlines():
+        try:
+            yield json.loads(line)
+        except json.JSONDecodeError:
+            continue
+
+
+def _codex_prompt(records):
+    """Find the first non-injected Codex user prompt."""
+    for record in records:
+        payload = record.get("payload") or {}
+        if record.get("type") != "response_item" or payload.get("type") != "message":
+            continue
+        if payload.get("role") != "user":
+            continue
+        blocks = payload.get("content") or []
+        text = "".join(
+            block.get("text", "") for block in blocks
+            if isinstance(block, dict)
+        ).strip()
+        if text and not _is_injected_user_text(text):
+            return text[:200]
+    return None
+
+
+def _codex_metadata_lite(path, head, tail, size):
+    """Extract bounded metadata from a Codex rollout."""
+    records = list(_jsonl_records(head)) + list(_jsonl_records(tail))
+    meta = next(
+        (item.get("payload") or {} for item in records if item.get("type") == "session_meta"),
+        {},
+    )
+    timestamps = [item.get("timestamp") for item in records if item.get("timestamp")]
+    start_time = timestamps[0] if timestamps else meta.get("timestamp")
+    end_time = timestamps[-1] if timestamps else start_time
+    start, end = parse_ts(start_time), parse_ts(end_time)
+    duration = round((end - start).total_seconds()) if start and end else None
+    prompt = _codex_prompt(records)
+    if prompt is None:
+        prompt = _codex_prompt(stream_raw_jsonl(path))
+    return {
+        "session_id": meta.get("session_id") or meta.get("id"),
+        "cwd": meta.get("cwd"),
+        "git_branch": None,
+        "version": meta.get("cli_version"),
+        "start_time": start_time,
+        "end_time": end_time,
+        "duration_seconds": duration,
+        "file_size_bytes": size,
+        "first_prompt": prompt,
+        "agent": "codex",
+    }
+
+
 def extract_metadata_lite(path):
     """Extract session metadata from head/tail only — no full parse.
     Used for session verification and discovery."""
     head, tail, size = read_head_tail(path)
+
+    if any(item.get("type") == "session_meta" for item in _jsonl_records(head)):
+        return _codex_metadata_lite(path, head, tail, size)
 
     # Extract from head (start of session)
     session_id = extract_json_field(head, "sessionId")
@@ -239,6 +323,7 @@ def extract_metadata_lite(path):
         "duration_seconds": duration_seconds,
         "file_size_bytes": size,
         "first_prompt": first_prompt,
+        "agent": "claude",
     }
 
 
@@ -255,6 +340,8 @@ def parse_ts(ts_str):
 def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
     """Main extraction pipeline using streaming — processes line-by-line."""
 
+    transcript_format = detect_transcript_format(jsonl_path)
+
     # Session metadata
     session = {
         "session_id": None,
@@ -265,6 +352,7 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
         "end_time": None,
         "duration_seconds": None,
         "branches_seen": set(),
+        "agent": transcript_format,
     }
 
     # Token totals
@@ -441,7 +529,7 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
                     elif isinstance(block, str):
                         user_text += block
                 user_text = user_text.strip()
-                if user_text and not user_text.startswith("<system-reminder>"):
+                if user_text and not _is_injected_user_text(user_text):
                     arc.append({
                         "role": "user",
                         "text": user_text[:2000],
@@ -454,7 +542,7 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
             if isinstance(content, str):
                 text = content
             text = text.strip()
-            if text and not text.startswith("<system-reminder>"):
+            if text and not _is_injected_user_text(text):
                 arc.append({
                     "role": "user",
                     "text": text[:2000],
@@ -472,12 +560,14 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
     session["branches_seen"] = sorted(session["branches_seen"])
 
     # Compute cost
-    cost = (
-        tokens_total["input_tokens"] / 1_000_000 * PRICE_PER_M["input"]
-        + tokens_total["output_tokens"] / 1_000_000 * PRICE_PER_M["output"]
-        + tokens_total["cache_creation_input_tokens"] / 1_000_000 * PRICE_PER_M["cache_create"]
-        + tokens_total["cache_read_input_tokens"] / 1_000_000 * PRICE_PER_M["cache_read"]
-    )
+    cost = None
+    if transcript_format == "claude":
+        cost = (
+            tokens_total["input_tokens"] / 1_000_000 * PRICE_PER_M["input"]
+            + tokens_total["output_tokens"] / 1_000_000 * PRICE_PER_M["output"]
+            + tokens_total["cache_creation_input_tokens"] / 1_000_000 * PRICE_PER_M["cache_create"]
+            + tokens_total["cache_read_input_tokens"] / 1_000_000 * PRICE_PER_M["cache_read"]
+        )
 
     # Attach result sizes to tool calls
     for call in tool_calls:
@@ -525,7 +615,7 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
         "tokens": {
             "total": tokens_total,
             "turn_count": turn_count,
-            "estimated_cost_usd": round(cost, 4),
+            "estimated_cost_usd": round(cost, 4) if cost is not None else None,
         },
         "agents": agents,
         "skills": skills,

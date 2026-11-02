@@ -114,16 +114,26 @@ class TestMetadataOnly(unittest.TestCase):
 class TestCodexSession(unittest.TestCase):
     def setUp(self):
         self.result = load_fixture_result("codex_session.jsonl")
+        self.meta = load_fixture_result("codex_session.jsonl", metadata_only=True)
 
     def test_format_detection(self):
         path = str(FIXTURES_DIR / "codex_session.jsonl")
         self.assertEqual(extract.detect_transcript_format(path), "codex")
+
+    def test_metadata_only(self):
+        self.assertEqual(self.meta["agent"], "codex")
+        self.assertEqual(self.meta["session_id"], "codex-session-123")
+        self.assertEqual(self.meta["cwd"], "/tmp/codex-project")
+        self.assertEqual(self.meta["first_prompt"], "Review yesterday's sessions.")
 
     def test_session_and_messages(self):
         self.assertEqual(self.result["session"]["session_id"], "codex-session-123")
         assistant = [item for item in self.result["conversation_arc"]
                      if item["role"] == "assistant"]
         self.assertEqual(len(assistant), 2)
+        users = [item["text"] for item in self.result["conversation_arc"]
+                 if item["role"] == "user"]
+        self.assertEqual(users, ["Review yesterday's sessions."])
 
     def test_tool_calls_and_results_are_correlated(self):
         self.assertEqual(self.result["tools"]["counts"]["exec"], 1)
@@ -135,6 +145,14 @@ class TestCodexSession(unittest.TestCase):
     def test_subagent_dispatch_is_normalized(self):
         self.assertEqual(self.result["tools"]["counts"]["Agent"], 1)
         self.assertEqual(self.result["agents"][0]["description"], "history_scan")
+
+    def test_tokens_are_preserved_without_invented_cost(self):
+        totals = self.result["tokens"]["total"]
+        self.assertEqual(self.result["session"]["agent"], "codex")
+        self.assertEqual(totals["input_tokens"], 400)
+        self.assertEqual(totals["cache_read_input_tokens"], 800)
+        self.assertEqual(totals["output_tokens"], 120)
+        self.assertIsNone(self.result["tokens"]["estimated_cost_usd"])
 
 
 # ---------------------------------------------------------------------------
