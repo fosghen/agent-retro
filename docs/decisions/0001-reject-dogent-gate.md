@@ -85,4 +85,3 @@ must classify every finding again and demonstrate unique signal beyond agnix.
 Official OpenAI skill tooling supports optional frontmatter metadata and nested
 resources, while the plugin validator accepts `agents/openai.yaml` interface
 metadata. Those contracts take precedence over dogent's stylistic preferences.
-
