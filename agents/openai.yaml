@@ -1,0 +1,4 @@
+interface:
+  display_name: "Agent Retro"
+  short_description: "Review Codex sessions and improve workflows"
+  default_prompt: "Use $agent-retro to review this Codex session and propose concrete workflow improvements."
