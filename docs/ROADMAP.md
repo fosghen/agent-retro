@@ -46,4 +46,5 @@ Add team queues, notifications, and web UI only after validating local use.
 
 ## Release policy
 
-Completion requires docs, migrations, failure tests, the full gate, and a local trial.
+Versions are released only when their capability milestone and common gate are
+complete. See [RELEASES.md](RELEASES.md) for the `v0.2.0` through `v1.0.0` gates.

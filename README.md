@@ -120,6 +120,7 @@ See [examples/sample-retro.md](examples/sample-retro.md) for a retro from a real
 ## Roadmap
 
 The analysis steps are agent-agnostic. Transcript readers currently support Claude Code and OpenAI Codex.
+Version publication follows the capability gates in [docs/RELEASES.md](docs/RELEASES.md), not dates.
 
 Planned support:
 
