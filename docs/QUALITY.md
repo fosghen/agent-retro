@@ -23,8 +23,6 @@ local configured checks.
   ([#13](https://github.com/fosghen/agent-retro/issues/13)).
 - `main` has no branch protection or required `quality` status check
   ([#14](https://github.com/fosghen/agent-retro/issues/14)).
-- Agent configuration lacks structural validation
-  ([#46](https://github.com/fosghen/agent-retro/issues/46)).
 
 ## Remaining target gate
 
@@ -35,9 +33,7 @@ work includes:
 1. Ruff format and lint ([#9](https://github.com/fosghen/agent-retro/issues/9));
 2. strict mypy ([#10](https://github.com/fosghen/agent-retro/issues/10));
 3. shell and plist syntax, package build, clean-environment install, and official
-   skill validation;
-4. agent configuration validation
-   ([#46](https://github.com/fosghen/agent-retro/issues/46)).
+   skill validation.
 
 Suppressions must remain narrow and justified. New checks must fix causes rather
 than weaken thresholds to hide existing violations.

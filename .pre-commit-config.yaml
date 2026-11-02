@@ -16,6 +16,12 @@ repos:
         language: system
         always_run: true
         pass_filenames: false
+      - id: agent-config
+        name: strict Codex agent configuration
+        entry: uv run --frozen --no-sync python scripts/check_agent_config.py
+        language: system
+        always_run: true
+        pass_filenames: false
       - id: security
         name: source and dependency security
         entry: bash -c 'uv run --frozen --no-sync bandit -q -r src scripts && uv run --frozen --no-sync pip-audit'

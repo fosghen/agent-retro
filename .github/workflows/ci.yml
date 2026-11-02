@@ -34,6 +34,7 @@ jobs:
       - name: Run tests
         run: |
           uv sync --locked --all-groups
+          uv run --frozen --no-sync python scripts/check_agent_config.py
           uv run --frozen --no-sync pytest
           uv run --frozen --no-sync bandit -q -r src scripts
           uv run --frozen --no-sync pip-audit
