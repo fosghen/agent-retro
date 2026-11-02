@@ -1,0 +1,10 @@
+{"timestamp":"2026-10-30T09:00:00Z","type":"session_meta","payload":{"session_id":"codex-session-123","cwd":"/tmp/codex-project","cli_version":"0.160.0"}}
+{"timestamp":"2026-10-30T09:00:01Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context>injected</environment_context>"}]}}
+{"timestamp":"2026-10-30T09:00:02Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Review yesterday's sessions."}]}}
+{"timestamp":"2026-10-30T09:00:03Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"I will inspect local history."}]}}
+{"timestamp":"2026-10-30T09:00:04Z","type":"response_item","payload":{"type":"custom_tool_call","name":"exec","call_id":"exec-1","input":"git status --short"}}
+{"timestamp":"2026-10-30T09:00:05Z","type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"exec-1","output":"clean"}}
+{"timestamp":"2026-10-30T09:00:06Z","type":"token_usage_record","payload":{"usage":{"input_tokens":1200,"cached_input_tokens":800,"output_tokens":120}}}
+{"timestamp":"2026-10-30T09:00:07Z","type":"response_item","payload":{"type":"function_call","name":"spawn_agent","call_id":"agent-1","arguments":"{\"task_name\":\"history_scan\",\"message\":\"Inspect sessions\"}"}}
+{"timestamp":"2026-10-30T09:00:08Z","type":"response_item","payload":{"type":"function_call_output","call_id":"agent-1","output":"done"}}
+{"timestamp":"2026-10-30T09:00:09Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"A reusable workflow exists."}]}}
