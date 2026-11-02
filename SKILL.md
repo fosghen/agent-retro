@@ -1,13 +1,13 @@
 ---
 name: agent-retro
 description: Run a conversation retrospective — analyze what happened in this session, what worked, what didn't, and propose concrete improvements. Use when the user says "retro", "retrospective", "what happened in this session", "session review", "what did we do", "analyze this conversation", or when wrapping up a long session and wanting to capture lessons. Especially useful after using a skill you're developing — identifies what can be improved about the skill, rules, setup, or process.
-compatibility: Requires Claude Code. Reads session transcripts from ~/.claude/projects/ (JSONL format). Python 3.8+ for the extraction script (stdlib only). Other agents are on the roadmap.
 metadata:
   author: giannimassi
-  version: "0.1.0"
+  version: "0.2.0"
+  compatibility: Supports Claude Code transcripts in ~/.claude/projects/ and OpenAI Codex transcripts in ~/.codex/sessions/. Python 3.8+.
 ---
 
-# /retro — Conversation Retrospective
+# Agent Session Retrospective
 
 Analyze the current session end-to-end: what happened, what it produced, what worked, what didn't, and what to improve. The output is a structured retro file plus a set of proposed actions you walk through with the user.
 
@@ -17,9 +17,9 @@ The full conversation lives in a JSONL file on disk — including tool calls, ag
 
 ### Find the current session
 
-The session file links a running process to its transcript. But session files are keyed by PID and may be cleaned up when processes end, so use a two-step approach with verification.
+Select the discovery flow for the active agent, then verify the candidate before analysis.
 
-**Step A: Try the sessions directory first**
+**Claude Code:** try the sessions directory first.
 ```bash
 ls -t ~/.claude/sessions/*.json | head -5
 ```
@@ -32,14 +32,19 @@ Read the most recent file(s). Match by `cwd` (should equal current working direc
 
 Where `<encoded-cwd>` replaces `/` with `-` (e.g., `/Users/foo/dev/myproject` → `-Users-foo-dev-myproject`).
 
-**Step B: If no session file matches** (PID rotated, file cleaned up), fall back to the most recently modified `.jsonl` in the project directory:
+If no Claude session file matches, use the most recently modified project transcript:
 ```bash
 ls -t ~/.claude/projects/<encoded-cwd>/*.jsonl | head -3
 ```
 
-**Step C: Verify you have the right file.** Use `--metadata-only` for cheap verification — it reads only the first/last 64KB of the file (no full parse):
+**OpenAI Codex:** list recent rollout files, then prefer candidates whose metadata `cwd` matches the current working directory:
 ```bash
-python3 ${CLAUDE_SKILL_DIR}/scripts/extract.py <candidate.jsonl> --metadata-only
+find ~/.codex/sessions -name '*.jsonl' -type f -print | tail -20
+```
+
+**Verify the candidate.** Use `--metadata-only` for cheap verification:
+```bash
+python3 <agent-retro-dir>/scripts/extract.py <candidate.jsonl> --metadata-only
 ```
 
 This returns session_id, cwd, git_branch, first_prompt, timestamps, and file size. Check `first_prompt` matches what was said at the start of the conversation.
@@ -49,7 +54,7 @@ If it doesn't match, try the next most recent file. If none match, state this in
 ### Run extraction
 
 ```bash
-python3 ${CLAUDE_SKILL_DIR}/scripts/extract.py <path-to-session.jsonl> --summary
+python3 <agent-retro-dir>/scripts/extract.py <path-to-session.jsonl> --summary
 ```
 
 Use `--summary` to get compact output (tool counts only, no individual call listings). If you need to drill into specific tool calls later, re-run without `--summary`.
@@ -75,7 +80,7 @@ The JSONL records cache-aware token usage:
 - `cache_read_input_tokens`: cache hits (charged at 0.1x input rate — this is usually the biggest number)
 - `output_tokens`: generated tokens (most expensive per-token)
 
-The script computes estimated USD cost using Opus pricing. For sessions with subagents, the subagent cost is separate and additive.
+The script estimates USD cost only for Claude sessions using the documented Opus pricing table. Codex token counts are preserved, but cost remains `null` because local transcripts do not establish billing.
 
 ### If extraction fails
 
@@ -101,7 +106,7 @@ What did this session actually produce? List all that apply.
 | Bug fix | Commits with "fix" prefix, debugging patterns |
 | Communication | Slack/email MCP calls, PR comments |
 | Local files | Writes to non-code files (plans, notes, docs) |
-| Setup changes | Edits to config, CLAUDE.md, settings, skills |
+| Setup changes | Edits to config, CLAUDE.md, AGENTS.md, settings, skills |
 | Spec / Design | Plan files, design discussion, no implementation |
 | Process improvement | Rule updates, workflow changes, skill creation |
 | Review | PR review calls, code-review agents |
@@ -134,7 +139,7 @@ Read the conversation arc. Look for these patterns in user messages:
 For each friction point, trace the causal chain:
 
 ```
-User correction -> What did Claude do wrong -> Why did Claude do that ->
+User correction -> What did the agent do wrong -> Why did it do that ->
 Was it a wrong assumption? Missing context? Bad skill guidance? Wrong tool?
 ```
 
@@ -150,7 +155,7 @@ Was it a wrong assumption? Missing context? Bad skill guidance? Wrong tool?
 
 **Over-engineering**: More tool calls or agent dispatches than the task warranted. Root cause: did a skill push Claude toward a heavyweight process when something simpler would have worked?
 
-**Under-specification**: Claude asked clarifying questions the user shouldn't have needed to answer (information was available in files, context, or memory). Root cause: missing research step? Skill didn't tell Claude where to look?
+**Under-specification**: The agent asked clarifying questions the user shouldn't have needed to answer (information was available in files, context, or memory). Root cause: missing research step? Skill didn't tell the agent where to look?
 
 ### For skill-development retros
 
@@ -175,7 +180,7 @@ For every issue from Step 5, propose a concrete action:
 |---|---|---|
 | `skill-update` | Edit an existing skill | The specific text to change and why |
 | `skill-create` | New skill needed | What it would do and when it triggers |
-| `rule-update` | Edit CLAUDE.md or rules/ | The rule text and which file |
+| `rule-update` | Edit CLAUDE.md, AGENTS.md, or rules/ | The rule text and which file |
 | `rule-create` | New rule file | The rule content |
 | `setup-change` | Config, hooks, tools | What to change and where |
 | `memory-update` | Save to auto-memory | The fact to remember |

@@ -1,8 +1,8 @@
 # agent-retro
 
-> **Compatibility: Claude Code only (for now).** This skill reads Claude Code's JSONL session transcripts. Support for other agents (Gemini CLI, Codex, Cursor, etc.) is on the [roadmap](#roadmap).
+> **Compatibility: Claude Code and OpenAI Codex.** The extractor auto-detects both JSONL transcript formats.
 
-A session retrospective skill for AI coding agents. Run `/agent-retro` at the end of a session to analyze what happened, identify friction, and get concrete suggestions for improving your skills, rules, and workflows.
+A session retrospective skill for AI coding agents. Invoke `agent-retro` (or ask for a session retrospective) to analyze what happened, identify friction, and get concrete suggestions for improving your skills, rules, and workflows.
 
 Follows the [Agent Skills](https://agentskills.io) open standard.
 
@@ -38,16 +38,16 @@ npx skills add giannimassi/agent-retro
 # Claude Code
 git clone https://github.com/giannimassi/agent-retro.git ~/.claude/skills/agent-retro
 
-# Gemini CLI (when supported)
-# git clone https://github.com/giannimassi/agent-retro.git ~/.gemini/skills/agent-retro
+# OpenAI Codex
+git clone https://github.com/fosghen/agent-retro.git ~/.codex/skills/agent-retro
 ```
 
 ## Usage
 
-At the end of any session:
+At the end of any session, invoke the skill or ask:
 
 ```
-/agent-retro
+Run a retrospective on this session.
 ```
 
 The skill will:
@@ -82,7 +82,7 @@ The extraction script (`scripts/extract.py`) minimizes token usage:
 
 - **Streaming** — processes JSONL line-by-line, never loads the full file into memory
 - **No tool result content** — tracks result **sizes** without including the content. A 50MB session transcript produces ~30KB of extraction output.
-- **Head/tail metadata** — `--metadata-only` reads only the first and last 64KB of the file for session verification, borrowing a technique from Claude Code's internal `readSessionLite` function.
+- **Bounded metadata reads** — `--metadata-only` uses the file head/tail and streams only until the first real prompt when injected Codex instructions fill the head buffer.
 - **Full conversation arc** — all user messages and assistant text are preserved. The arc is the whole point of a retro — you can't analyze friction you can't see.
 
 ### What the extraction captures
@@ -105,7 +105,7 @@ See [examples/sample-retro.md](examples/sample-retro.md) for a retro from a real
 
 ## Roadmap
 
-This skill currently only works with **Claude Code**. The analysis steps (friction detection, root cause tracing, action proposals) are agent-agnostic — only the transcript reading is Claude-specific.
+The analysis steps are agent-agnostic. Transcript readers currently support Claude Code and OpenAI Codex.
 
 Planned support:
 
@@ -113,7 +113,7 @@ Planned support:
 |---|---|---|
 | **Claude Code** | `~/.claude/projects/<cwd>/<session>.jsonl` | Supported |
 | **Gemini CLI** | `~/.gemini/sessions/` | Planned |
-| **OpenAI Codex** | TBD | Planned |
+| **OpenAI Codex** | `~/.codex/sessions/YYYY/MM/DD/*.jsonl` | Supported |
 | **Cursor** | TBD | Planned |
 | **Roo Code** | TBD | Planned |
 
@@ -122,7 +122,7 @@ Contributions welcome — if you know where another agent stores its session dat
 ## Requirements
 
 - Python 3.8+ (stdlib only, no dependencies)
-- Currently: Claude Code v2.1.59+
+- Tested transcript formats: Claude Code v2.1.59+ and current Codex rollout JSONL
 
 ## License
 
