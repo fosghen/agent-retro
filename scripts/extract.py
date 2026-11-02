@@ -34,8 +34,8 @@ SCHEMA_VERSION = "0.1.0"
 LITE_READ_BUF_SIZE = 65536
 
 
-def stream_jsonl(path):
-    """Yield parsed records one at a time without loading the full file."""
+def stream_raw_jsonl(path):
+    """Yield parsed records without format-specific normalization."""
     with open(path) as f:
         for line in f:
             line = line.strip()
@@ -44,6 +44,112 @@ def stream_jsonl(path):
                     yield json.loads(line)
                 except json.JSONDecodeError:
                     continue
+
+
+def detect_transcript_format(path):
+    """Detect the transcript producer from its first meaningful record."""
+    for record in stream_raw_jsonl(path):
+        if record.get("type") == "session_meta" and isinstance(record.get("payload"), dict):
+            return "codex"
+        return "claude"
+    return "claude"
+
+
+def _normalize_codex_content(content):
+    """Convert Codex text blocks to the shared text-block shape."""
+    if not isinstance(content, list):
+        return content
+    normalized = []
+    for block in content:
+        if not isinstance(block, dict):
+            continue
+        if block.get("type") in ("input_text", "output_text", "text"):
+            normalized.append({"type": "text", "text": block.get("text", "")})
+    return normalized
+
+
+def _json_object(value):
+    """Decode a JSON object, returning an empty object for invalid input."""
+    if isinstance(value, dict):
+        return value
+    if not isinstance(value, str):
+        return {}
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _codex_tool_use(payload):
+    """Normalize Codex custom and function tool calls."""
+    name = payload.get("name", "unknown")
+    if payload.get("type") == "custom_tool_call":
+        tool_input = {"command": payload.get("input", "")}
+    else:
+        tool_input = _json_object(payload.get("arguments"))
+    if name.endswith("spawn_agent"):
+        name = "Agent"
+        tool_input = {
+            "description": tool_input.get("task_name", ""),
+            "subagent_type": tool_input.get("task_name", ""),
+            "model": tool_input.get("model", ""),
+            "prompt": tool_input.get("message", ""),
+        }
+    return {
+        "type": "tool_use",
+        "id": payload.get("call_id", ""),
+        "name": name,
+        "input": tool_input,
+    }
+
+
+def _normalize_codex_record(record):
+    """Translate a Codex rollout record into the shared record shape."""
+    payload = record.get("payload") or {}
+    timestamp = record.get("timestamp")
+    if record.get("type") == "session_meta":
+        return {
+            "sessionId": payload.get("session_id") or payload.get("id"),
+            "cwd": payload.get("cwd"),
+            "version": payload.get("cli_version"),
+            "timestamp": timestamp or payload.get("timestamp"),
+        }
+    if record.get("type") != "response_item":
+        return {"timestamp": timestamp}
+    if payload.get("type") == "message":
+        return {
+            "timestamp": timestamp,
+            "message": {
+                "role": payload.get("role"),
+                "content": _normalize_codex_content(payload.get("content", [])),
+            },
+        }
+    if payload.get("type") in ("custom_tool_call", "function_call"):
+        return {
+            "timestamp": timestamp,
+            "message": {"role": "assistant", "content": [_codex_tool_use(payload)]},
+        }
+    if payload.get("type") in ("custom_tool_call_output", "function_call_output"):
+        return {
+            "timestamp": timestamp,
+            "message": {
+                "role": "user",
+                "content": [{
+                    "type": "tool_result",
+                    "tool_use_id": payload.get("call_id", ""),
+                    "content": payload.get("output", ""),
+                }],
+            },
+        }
+    return {"timestamp": timestamp}
+
+
+def stream_jsonl(path):
+    """Yield records in the extractor's common shape."""
+    transcript_format = detect_transcript_format(path)
+    for record in stream_raw_jsonl(path):
+        yield _normalize_codex_record(record) if transcript_format == "codex" else record
 
 
 def read_head_tail(path):
@@ -252,7 +358,7 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
                     elif name == "Skill":
                         call_summary["skill_name"] = tool_input.get("skill", "")
                         call_summary["skill_args"] = tool_input.get("args", "")
-                    elif name == "Bash":
+                    elif name in ("Bash", "exec", "exec_command"):
                         call_summary["command"] = tool_input.get("command", "")[:300]
                     elif name in ("Read", "Write", "Edit"):
                         call_summary["file_path"] = tool_input.get("file_path", "")
@@ -282,7 +388,7 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
                             files["edited"].add(fp)
 
                     # Track git activity from bash commands
-                    if name == "Bash":
+                    if name in ("Bash", "exec", "exec_command"):
                         cmd = tool_input.get("command", "")
                         if "git commit" in cmd:
                             commits.append({"command": cmd[:200], "timestamp": ts})
