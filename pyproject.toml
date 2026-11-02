@@ -31,6 +31,14 @@ packages = ["src/agent_retro"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+addopts = ["--cov", "--cov-branch", "--cov-report=term-missing"]
+
+[tool.coverage.run]
+source = ["agent_retro", "scripts"]
+
+[tool.coverage.report]
+fail_under = 67
+show_missing = true
 
 [tool.ruff]
 target-version = "py312"

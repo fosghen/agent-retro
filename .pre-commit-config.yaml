@@ -11,8 +11,8 @@ repos:
         always_run: true
         pass_filenames: false
       - id: tests
-        name: unit tests
-        entry: uv run --frozen --no-sync python -m unittest discover -s tests
+        name: tests with branch coverage
+        entry: uv run --frozen --no-sync pytest
         language: system
         always_run: true
         pass_filenames: false
