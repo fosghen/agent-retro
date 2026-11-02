@@ -55,9 +55,48 @@ def detect_transcript_format(path):
     return "claude"
 
 
+def _normalize_codex_content(content):
+    """Convert Codex text blocks to the shared text-block shape."""
+    if not isinstance(content, list):
+        return content
+    normalized = []
+    for block in content:
+        if not isinstance(block, dict):
+            continue
+        if block.get("type") in ("input_text", "output_text", "text"):
+            normalized.append({"type": "text", "text": block.get("text", "")})
+    return normalized
+
+
+def _normalize_codex_record(record):
+    """Translate a Codex rollout record into the shared record shape."""
+    payload = record.get("payload") or {}
+    timestamp = record.get("timestamp")
+    if record.get("type") == "session_meta":
+        return {
+            "sessionId": payload.get("session_id") or payload.get("id"),
+            "cwd": payload.get("cwd"),
+            "version": payload.get("cli_version"),
+            "timestamp": timestamp or payload.get("timestamp"),
+        }
+    if record.get("type") != "response_item":
+        return {"timestamp": timestamp}
+    if payload.get("type") == "message":
+        return {
+            "timestamp": timestamp,
+            "message": {
+                "role": payload.get("role"),
+                "content": _normalize_codex_content(payload.get("content", [])),
+            },
+        }
+    return {"timestamp": timestamp}
+
+
 def stream_jsonl(path):
     """Yield records in the extractor's common shape."""
-    yield from stream_raw_jsonl(path)
+    transcript_format = detect_transcript_format(path)
+    for record in stream_raw_jsonl(path):
+        yield _normalize_codex_record(record) if transcript_format == "codex" else record
 
 
 def read_head_tail(path):
