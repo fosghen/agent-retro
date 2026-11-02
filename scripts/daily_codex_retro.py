@@ -26,8 +26,16 @@ def command(home: Path, day: date, report: Path) -> list[str]:
         "Return a concise Markdown report with evidence and no transcript excerpts."
     )
     return [
-        codex, "exec", "--skip-git-repo-check", "--sandbox", "read-only",
-        "--output-last-message", str(report), "--cd", str(home), prompt,
+        codex,
+        "exec",
+        "--skip-git-repo-check",
+        "--sandbox",
+        "read-only",
+        "--output-last-message",
+        str(report),
+        "--cd",
+        str(home),
+        prompt,
     ]
 
 
