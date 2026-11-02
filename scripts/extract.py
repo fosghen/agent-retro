@@ -34,8 +34,8 @@ SCHEMA_VERSION = "0.1.0"
 LITE_READ_BUF_SIZE = 65536
 
 
-def stream_jsonl(path):
-    """Yield parsed records one at a time without loading the full file."""
+def stream_raw_jsonl(path):
+    """Yield parsed records without format-specific normalization."""
     with open(path) as f:
         for line in f:
             line = line.strip()
@@ -44,6 +44,20 @@ def stream_jsonl(path):
                     yield json.loads(line)
                 except json.JSONDecodeError:
                     continue
+
+
+def detect_transcript_format(path):
+    """Detect the transcript producer from its first meaningful record."""
+    for record in stream_raw_jsonl(path):
+        if record.get("type") == "session_meta" and isinstance(record.get("payload"), dict):
+            return "codex"
+        return "claude"
+    return "claude"
+
+
+def stream_jsonl(path):
+    """Yield records in the extractor's common shape."""
+    yield from stream_raw_jsonl(path)
 
 
 def read_head_tail(path):

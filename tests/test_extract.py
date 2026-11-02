@@ -111,6 +111,12 @@ class TestMetadataOnly(unittest.TestCase):
         self.assertEqual(self.meta["version"], "1.2.3")
 
 
+class TestCodexSession(unittest.TestCase):
+    def test_format_detection(self):
+        path = str(FIXTURES_DIR / "codex_session.jsonl")
+        self.assertEqual(extract.detect_transcript_format(path), "codex")
+
+
 # ---------------------------------------------------------------------------
 # 2. Full extraction — session metadata
 # ---------------------------------------------------------------------------
