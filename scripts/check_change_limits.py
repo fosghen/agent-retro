@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 import shutil
-import subprocess
+import subprocess  # nosec B404 -- only a resolved Git executable is invoked.
 import sys
 
 MAX_LINES = 50
@@ -51,7 +51,7 @@ def git(*args: str) -> str:
     if executable is None:
         message = "Git executable is unavailable"
         raise RuntimeError(message)
-    result = subprocess.run(  # noqa: S603 -- resolved trusted Git executable
+    result = subprocess.run(  # noqa: S603  # nosec B603 -- resolved Git executable
         [executable, *args], check=True, capture_output=True, text=True
     )
     return result.stdout.strip()
