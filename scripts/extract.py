@@ -213,6 +213,33 @@ def extract_json_field(text, key):
     return None
 
 
+def _jsonl_records(text):
+    """Parse complete JSONL records from a bounded text buffer."""
+    for line in text.splitlines():
+        try:
+            yield json.loads(line)
+        except json.JSONDecodeError:
+            continue
+
+
+def _codex_prompt(records):
+    """Find the first non-injected Codex user prompt."""
+    for record in records:
+        payload = record.get("payload") or {}
+        if record.get("type") != "response_item" or payload.get("type") != "message":
+            continue
+        if payload.get("role") != "user":
+            continue
+        blocks = payload.get("content") or []
+        text = "".join(
+            block.get("text", "") for block in blocks
+            if isinstance(block, dict)
+        ).strip()
+        if text and not _is_injected_user_text(text):
+            return text[:200]
+    return None
+
+
 def extract_metadata_lite(path):
     """Extract session metadata from head/tail only — no full parse.
     Used for session verification and discovery."""
