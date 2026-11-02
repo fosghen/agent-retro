@@ -4,7 +4,8 @@
 from __future__ import annotations
 
 import shutil
-import subprocess
+# Only the resolved Codex executable is invoked; arguments are not shell-evaluated.
+import subprocess  # nosec B404
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
@@ -50,7 +51,7 @@ def main() -> int:
     reports = home / ".codex" / "worklog" / "retros"
     reports.mkdir(parents=True, exist_ok=True)
     report = reports / f"{day.isoformat()}-daily.md"
-    subprocess.run(  # noqa: S603 -- executable is resolved with shutil.which
+    subprocess.run(  # noqa: S603  # nosec B603
         command(home, day, report), check=True
     )
     return 0
