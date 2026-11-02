@@ -6,13 +6,13 @@ repos:
     hooks:
       - id: change-limits
         name: branch and 50-line commit limit
-        entry: python3 scripts/check_change_limits.py
+        entry: uv run --frozen --no-sync python scripts/check_change_limits.py
         language: system
         always_run: true
         pass_filenames: false
       - id: tests
         name: unit tests
-        entry: python3 -m unittest discover -s tests
+        entry: uv run --frozen --no-sync python -m unittest discover -s tests
         language: system
         always_run: true
         pass_filenames: false
