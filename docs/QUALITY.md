@@ -1,53 +1,57 @@
 # Quality policy and audit
 
-Audit date: 2026-11-02, using repository configuration and clean-checkout checks.
+Audit date: 2026-11-02, using repository configuration, GitHub REST state, and
+local configured checks.
 
 ## Current enforcement
 
-- CI and pre-commit configuration run 140 unit tests.
-- CI rejects over five commits per PR, over 50 changed lines, and binaries.
-- GitHub Actions use commit-pinned official actions and read-only permissions.
-- Compilation, shell/plist syntax, tests, and skill validation pass manually.
+- Pull-request CI rejects more than five commits, commits over 50 changed lines,
+  binary changes, and changes made directly on a protected branch name.
+- CI installs the locked Python 3.12 development environment, runs pytest with
+  branch coverage and a 67% minimum, scans source with Bandit, audits locked
+  dependencies with pip-audit, and smoke-tests the installed CLI.
+- The pre-commit configuration runs the same change-policy, pytest, Bandit, and
+  pip-audit commands. Hook installation is not automated or verified yet.
+- CI also runs the security checks every Monday at 05:23 UTC. GitHub Actions use
+  commit-pinned actions and read-only repository permissions.
 
 ## Gaps observed
 
-- No formatter, linter, typing, coverage, security, lock, or build gate exists.
-- The local pre-commit hook is not installed, so its configuration is advisory.
-- `main` has no branch protection or required status check; direct pushes and
-  merges with failing or absent CI remain possible.
-- GitHub permits unpinned third-party actions globally, although none exist now.
-- CI tests only Python 3.12 while the README claims Python 3.8+ compatibility.
+- Ruff formatting and linting are not enforced ([#9](https://github.com/fosghen/agent-retro/issues/9)).
+- Strict mypy is not enforced ([#10](https://github.com/fosghen/agent-retro/issues/10)).
+- There is no single local gate or verified hook bootstrap
+  ([#13](https://github.com/fosghen/agent-retro/issues/13)).
+- `main` has no branch protection or required `quality` status check
+  ([#14](https://github.com/fosghen/agent-retro/issues/14)).
+- Agent configuration lacks structural validation
+  ([#46](https://github.com/fosghen/agent-retro/issues/46)).
 
-## Target gate
+## Remaining target gate
 
-One reproducible command must run the same blocking checks locally and in CI:
+The complete gate tracked by [#13](https://github.com/fosghen/agent-retro/issues/13)
+must expose one setup command and one local command that CI also uses. Remaining
+work includes:
 
-1. repository change policy and generated-file policy;
-2. Ruff format and lint with an explicit strict rule set;
-3. mypy strict over application and deterministic scripts;
-4. pytest with branch coverage and a ratcheted minimum;
-5. Bandit and dependency vulnerability scanning;
-6. shell syntax, plist lint, and official skill validation;
-7. package build, clean-environment install, and CLI smoke test.
+1. Ruff format and lint ([#9](https://github.com/fosghen/agent-retro/issues/9));
+2. strict mypy ([#10](https://github.com/fosghen/agent-retro/issues/10));
+3. shell and plist syntax, package build, clean-environment install, and official
+   skill validation;
+4. agent configuration validation
+   ([#46](https://github.com/fosghen/agent-retro/issues/46)).
 
-Suppressions need narrow scope, a reason, and preferably an issue. Checks may be
-incremental but must not be weakened merely to hide existing violations.
-
-The CI security gate also runs every Monday at 05:23 UTC so newly disclosed
-dependency vulnerabilities are detected even when the repository is idle.
+Suppressions must remain narrow and justified. New checks must fix causes rather
+than weaken thresholds to hide existing violations.
 
 ## Repository enforcement
 
-Protect `main`, require current branches and quality CI, block force pushes and
-deletion, and include admins. Keep review optional, while requiring approval before
-the application creates an implementation PR.
-
-## Compatibility decision required
-
-Test every declared Python version or raise the minimum. Python 3.12 is recommended
-because execution and CI use it; preserving 3.8 needs a compatibility matrix.
+Planned under [#14](https://github.com/fosghen/agent-retro/issues/14): protect
+`main`, require current branches and the `quality` check, block force pushes and
+deletion, and apply the rules to administrators. Review remains optional.
 
 ## Audit limitations
 
-No dependency or security checker ran because none is declared. Branch rules came
-from GitHub REST API; organization-level rulesets were not assumed.
+This audit inspected repository configuration at the dated `main` revision and
+ran the configured checks on macOS. It did not repeat setup from a clean checkout
+or validate Linux-specific behavior. GitHub REST reported that `main` was
+unprotected; organization-level rulesets were not assumed. pip-audit checks locked
+third-party dependencies but skips the unpublished local `agent-retro` package.
