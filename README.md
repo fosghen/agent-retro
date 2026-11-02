@@ -24,23 +24,18 @@ Every agent framework has inline reflection (retry loops, critic agents). None o
 
 This is the equivalent of an agile sprint retrospective, but for a single AI session, producing machine-editable artifacts rather than sticky notes on a board. See [references/design.md](references/design.md) for the full design rationale and comparison with Reflexion, LangGraph, CrewAI, and others.
 
-## Install
+## Install for Codex
 
-**Recommended** (works with any Agent Skills-compatible tool):
-
-```bash
-npx skills add giannimassi/agent-retro
-```
-
-**Or clone manually** into your skills directory:
+Clone this repository into the Codex skills directory and install its locked environment:
 
 ```bash
-# Claude Code
-git clone https://github.com/giannimassi/agent-retro.git ~/.claude/skills/agent-retro
-
-# OpenAI Codex
 git clone https://github.com/fosghen/agent-retro.git ~/.codex/skills/agent-retro
+cd ~/.codex/skills/agent-retro
+uv sync --locked --all-groups
 ```
+
+Start a new Codex session if `agent-retro` is not immediately listed among the available skills.
+Claude Code-specific installation and runtime behavior are outside the project's release guarantees.
 
 ## Usage
 
@@ -119,16 +114,16 @@ See [examples/sample-retro.md](examples/sample-retro.md) for a retro from a real
 
 ## Roadmap
 
-The analysis steps are agent-agnostic. Transcript readers currently support Claude Code and OpenAI Codex.
+The application, automation, and release gates target Codex. Transcript parsing remains extensible to other agents.
 Version publication follows the capability gates in [docs/RELEASES.md](docs/RELEASES.md), not dates.
 
 Planned support:
 
 | Agent | Transcript format | Status |
 |---|---|---|
-| **Claude Code** | `~/.claude/projects/<cwd>/<session>.jsonl` | Supported |
+| **OpenAI Codex** | `~/.codex/sessions/YYYY/MM/DD/*.jsonl` | Primary |
+| **Claude Code import** | `~/.claude/projects/<cwd>/<session>.jsonl` | Compatible |
 | **Gemini CLI** | `~/.gemini/sessions/` | Planned |
-| **OpenAI Codex** | `~/.codex/sessions/YYYY/MM/DD/*.jsonl` | Supported |
 | **Cursor** | TBD | Planned |
 | **Roo Code** | TBD | Planned |
 
