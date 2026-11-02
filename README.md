@@ -1,8 +1,8 @@
 # agent-retro
 
-> **Compatibility: Claude Code only (for now).** This skill reads Claude Code's JSONL session transcripts. Support for other agents (Gemini CLI, Codex, Cursor, etc.) is on the [roadmap](#roadmap).
+> **Compatibility: Claude Code and OpenAI Codex.** The extractor auto-detects both JSONL transcript formats.
 
-A session retrospective skill for AI coding agents. Run `/agent-retro` at the end of a session to analyze what happened, identify friction, and get concrete suggestions for improving your skills, rules, and workflows.
+A session retrospective skill for AI coding agents. Invoke `agent-retro` (or ask for a session retrospective) to analyze what happened, identify friction, and get concrete suggestions for improving your skills, rules, and workflows.
 
 Follows the [Agent Skills](https://agentskills.io) open standard.
 
@@ -38,16 +38,16 @@ npx skills add giannimassi/agent-retro
 # Claude Code
 git clone https://github.com/giannimassi/agent-retro.git ~/.claude/skills/agent-retro
 
-# Gemini CLI (when supported)
-# git clone https://github.com/giannimassi/agent-retro.git ~/.gemini/skills/agent-retro
+# OpenAI Codex
+git clone https://github.com/fosghen/agent-retro.git ~/.codex/skills/agent-retro
 ```
 
 ## Usage
 
-At the end of any session:
+At the end of any session, invoke the skill or ask:
 
 ```
-/agent-retro
+Run a retrospective on this session.
 ```
 
 The skill will:
