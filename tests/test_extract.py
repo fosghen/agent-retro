@@ -124,6 +124,9 @@ class TestCodexSession(unittest.TestCase):
         assistant = [item for item in self.result["conversation_arc"]
                      if item["role"] == "assistant"]
         self.assertEqual(len(assistant), 2)
+        users = [item["text"] for item in self.result["conversation_arc"]
+                 if item["role"] == "user"]
+        self.assertEqual(users, ["Review yesterday's sessions."])
 
     def test_tool_calls_and_results_are_correlated(self):
         self.assertEqual(self.result["tools"]["counts"]["exec"], 1)

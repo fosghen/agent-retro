@@ -81,6 +81,14 @@ def _json_object(value):
     return parsed if isinstance(parsed, dict) else {}
 
 
+def _is_injected_user_text(text):
+    return text.lstrip().startswith((
+        "<system-reminder>",
+        "<environment_context>",
+        "# AGENTS.md instructions for ",
+    ))
+
+
 def _codex_tool_use(payload):
     """Normalize Codex custom and function tool calls."""
     name = payload.get("name", "unknown")
@@ -461,7 +469,7 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
                     elif isinstance(block, str):
                         user_text += block
                 user_text = user_text.strip()
-                if user_text and not user_text.startswith("<system-reminder>"):
+                if user_text and not _is_injected_user_text(user_text):
                     arc.append({
                         "role": "user",
                         "text": user_text[:2000],
@@ -474,7 +482,7 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
             if isinstance(content, str):
                 text = content
             text = text.strip()
-            if text and not text.startswith("<system-reminder>"):
+            if text and not _is_injected_user_text(text):
                 arc.append({
                     "role": "user",
                     "text": text[:2000],
