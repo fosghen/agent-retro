@@ -2,9 +2,9 @@
 name: agent-retro
 description: Run a conversation retrospective — analyze what happened in this session, what worked, what didn't, and propose concrete improvements. Use when the user says "retro", "retrospective", "what happened in this session", "session review", "what did we do", "analyze this conversation", or when wrapping up a long session and wanting to capture lessons. Especially useful after using a skill you're developing — identifies what can be improved about the skill, rules, setup, or process.
 metadata:
-  author: giannimassi
+  author: fosghen
   version: "0.2.0"
-  compatibility: Supports Claude Code transcripts in ~/.claude/projects/ and OpenAI Codex transcripts in ~/.codex/sessions/. Python 3.8+.
+  compatibility: Primary support for OpenAI Codex sessions in ~/.codex/sessions/; Claude Code JSONL is an imported format. Python 3.12.
 ---
 
 # Agent Session Retrospective
@@ -17,9 +17,15 @@ The full conversation lives in a JSONL file on disk — including tool calls, ag
 
 ### Find the current session
 
-Select the discovery flow for the active agent, then verify the candidate before analysis.
+Start with Codex discovery. Use the Claude Code import flow only when the user
+explicitly supplies or requests an imported Claude transcript.
 
-**Claude Code:** try the sessions directory first.
+**OpenAI Codex:** list recent rollout files, then prefer candidates whose metadata `cwd` matches the current working directory:
+```bash
+find ~/.codex/sessions -name '*.jsonl' -type f -print | tail -20
+```
+
+**Claude Code import:** try the sessions directory first.
 ```bash
 ls -t ~/.claude/sessions/*.json | head -5
 ```
@@ -35,11 +41,6 @@ Where `<encoded-cwd>` replaces `/` with `-` (e.g., `/Users/foo/dev/myproject` �
 If no Claude session file matches, use the most recently modified project transcript:
 ```bash
 ls -t ~/.claude/projects/<encoded-cwd>/*.jsonl | head -3
-```
-
-**OpenAI Codex:** list recent rollout files, then prefer candidates whose metadata `cwd` matches the current working directory:
-```bash
-find ~/.codex/sessions -name '*.jsonl' -type f -print | tail -20
 ```
 
 **Verify the candidate.** Use `--metadata-only` for cheap verification:
@@ -197,7 +198,7 @@ For skill-update actions specifically, include:
 
 ## Step 7: Write the Retro File
 
-Save to `~/.claude/worklog/retros/YYYY-MM-DD-<slug>.md` (create the directory if it doesn't exist).
+Save to `~/.codex/worklog/retros/YYYY-MM-DD-<slug>.md` (create the directory if it doesn't exist).
 
 ```markdown
 # Retro: <Session Description>
