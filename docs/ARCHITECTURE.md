@@ -22,6 +22,7 @@ user decision -> implementation PR -> outcome observation`
 
 Raw transcripts stay in their original local directories. Derived records must
 contain bounded excerpts or hashes, never credentials or complete tool output.
+Retention, export, deletion, backup, and recovery follow [DATA_POLICY.md](DATA_POLICY.md).
 
 ## Proposal model
 
