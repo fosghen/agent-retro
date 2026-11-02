@@ -114,10 +114,17 @@ class TestMetadataOnly(unittest.TestCase):
 class TestCodexSession(unittest.TestCase):
     def setUp(self):
         self.result = load_fixture_result("codex_session.jsonl")
+        self.meta = load_fixture_result("codex_session.jsonl", metadata_only=True)
 
     def test_format_detection(self):
         path = str(FIXTURES_DIR / "codex_session.jsonl")
         self.assertEqual(extract.detect_transcript_format(path), "codex")
+
+    def test_metadata_only(self):
+        self.assertEqual(self.meta["agent"], "codex")
+        self.assertEqual(self.meta["session_id"], "codex-session-123")
+        self.assertEqual(self.meta["cwd"], "/tmp/codex-project")
+        self.assertEqual(self.meta["first_prompt"], "Review yesterday's sessions.")
 
     def test_session_and_messages(self):
         self.assertEqual(self.result["session"]["session_id"], "codex-session-123")
