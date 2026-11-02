@@ -4,6 +4,8 @@ on:
   pull_request:
   push:
     branches: [main]
+  schedule:
+    - cron: "23 5 * * 1"
 
 permissions:
   contents: read
@@ -33,4 +35,6 @@ jobs:
         run: |
           uv sync --locked --all-groups
           uv run --frozen --no-sync pytest
+          uv run --frozen --no-sync bandit -q -r src scripts
+          uv run --frozen --no-sync pip-audit
           uv run --frozen --no-sync agent-retro --help

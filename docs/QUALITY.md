@@ -33,6 +33,9 @@ One reproducible command must run the same blocking checks locally and in CI:
 Suppressions need narrow scope, a reason, and preferably an issue. Checks may be
 incremental but must not be weakened merely to hide existing violations.
 
+The CI security gate also runs every Monday at 05:23 UTC so newly disclosed
+dependency vulnerabilities are detected even when the repository is idle.
+
 ## Repository enforcement
 
 Protect `main`, require current branches and quality CI, block force pushes and
