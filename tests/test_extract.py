@@ -136,6 +136,14 @@ class TestCodexSession(unittest.TestCase):
         self.assertEqual(self.result["tools"]["counts"]["Agent"], 1)
         self.assertEqual(self.result["agents"][0]["description"], "history_scan")
 
+    def test_tokens_are_preserved_without_invented_cost(self):
+        totals = self.result["tokens"]["total"]
+        self.assertEqual(self.result["session"]["agent"], "codex")
+        self.assertEqual(totals["input_tokens"], 400)
+        self.assertEqual(totals["cache_read_input_tokens"], 800)
+        self.assertEqual(totals["output_tokens"], 120)
+        self.assertIsNone(self.result["tokens"]["estimated_cost_usd"])
+
 
 # ---------------------------------------------------------------------------
 # 2. Full extraction — session metadata
