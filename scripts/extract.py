@@ -68,6 +68,42 @@ def _normalize_codex_content(content):
     return normalized
 
 
+def _json_object(value):
+    """Decode a JSON object, returning an empty object for invalid input."""
+    if isinstance(value, dict):
+        return value
+    if not isinstance(value, str):
+        return {}
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _codex_tool_use(payload):
+    """Normalize Codex custom and function tool calls."""
+    name = payload.get("name", "unknown")
+    if payload.get("type") == "custom_tool_call":
+        tool_input = {"command": payload.get("input", "")}
+    else:
+        tool_input = _json_object(payload.get("arguments"))
+    if name.endswith("spawn_agent"):
+        name = "Agent"
+        tool_input = {
+            "description": tool_input.get("task_name", ""),
+            "subagent_type": tool_input.get("task_name", ""),
+            "model": tool_input.get("model", ""),
+            "prompt": tool_input.get("message", ""),
+        }
+    return {
+        "type": "tool_use",
+        "id": payload.get("call_id", ""),
+        "name": name,
+        "input": tool_input,
+    }
+
+
 def _normalize_codex_record(record):
     """Translate a Codex rollout record into the shared record shape."""
     payload = record.get("payload") or {}
@@ -88,6 +124,11 @@ def _normalize_codex_record(record):
                 "role": payload.get("role"),
                 "content": _normalize_codex_content(payload.get("content", [])),
             },
+        }
+    if payload.get("type") in ("custom_tool_call", "function_call"):
+        return {
+            "timestamp": timestamp,
+            "message": {"role": "assistant", "content": [_codex_tool_use(payload)]},
         }
     return {"timestamp": timestamp}
 
