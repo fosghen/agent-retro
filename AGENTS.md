@@ -1,5 +1,16 @@
 # Agent instructions
 
+## Project overview
+
+Agent Retro is a Python 3.12 local-first Codex retrospective application and
+distributable skill.
+
+## Setup and checks
+
+Set up with `uv sync --locked --all-groups`. Run tests with
+`uv run --frozen --no-sync pytest` and validate agent configuration with
+`uv run --frozen --no-sync python scripts/check_agent_config.py`.
+
 Read `README.md`, `SKILL.md`, and relevant tests before changing behavior. Treat
 session logs as sensitive input: never commit real transcripts, credentials, or
 private source. Use synthetic fixtures only.
