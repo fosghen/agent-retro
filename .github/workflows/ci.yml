@@ -32,5 +32,5 @@ jobs:
       - name: Run tests
         run: |
           uv sync --locked --all-groups
-          uv run --frozen --no-sync python -m unittest discover -s tests
+          uv run --frozen --no-sync pytest
           uv run --frozen --no-sync agent-retro --help
