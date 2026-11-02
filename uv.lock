@@ -13,6 +13,7 @@ source = { editable = "." }
 
 [package.dev-dependencies]
 dev = [
+    { name = "agnix" },
     { name = "bandit" },
     { name = "mypy" },
     { name = "pip-audit" },
@@ -26,6 +27,7 @@ dev = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "agnix", specifier = "==0.60.3" },
     { name = "bandit", specifier = ">=1.8,<2" },
     { name = "mypy", specifier = ">=1.15,<2" },
     { name = "pip-audit", specifier = ">=2.8,<3" },
@@ -33,6 +35,18 @@ dev = [
     { name = "pytest", specifier = ">=8.3,<10" },
     { name = "pytest-cov", specifier = ">=6,<8" },
     { name = "ruff", specifier = ">=0.11,<1" },
+]
+
+[[package]]
+name = "agnix"
+version = "0.60.3"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c9/af/60d65f0d700b7fbe72c3aea2d421532e8189924f49f2bd169647f0095372/agnix-0.60.3-py3-none-macosx_11_0_arm64.whl", hash = "sha256:d8f923bfb12792c05b920841875aa2f729fcc2ce58344c3ea0c5b35d83f1a3a9", size = 5395530, upload-time = "2026-11-02T08:20:14.051Z" },
+    { url = "https://files.pythonhosted.org/packages/91/e2/87e092294266e8f8c386dcab44c0c7f3fc0d8c949743d8a627a4b60d7235/agnix-0.60.3-py3-none-manylinux_2_18_aarch64.whl", hash = "sha256:fab8803a584514a0b2da275039fd098bc92c05c54038171b0a73d9dd23db10a9", size = 5623534, upload-time = "2026-11-02T08:20:15.541Z" },
+    { url = "https://files.pythonhosted.org/packages/8d/18/b31656213536b15771eae002c75fa4753011f46d141854711417c5cfccf6/agnix-0.60.3-py3-none-manylinux_2_18_x86_64.whl", hash = "sha256:937349caf120f793615ecde3c4976c86f0410469debd7462756ba6165404a0d7", size = 6253036, upload-time = "2026-11-02T08:20:16.955Z" },
+    { url = "https://files.pythonhosted.org/packages/2d/40/f898b3e236ee92185c93abb47a75cd19727fba40b0f37fcb9a89eda156e0/agnix-0.60.3-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:6586a9007b7b45273a03bc5ade73be2e8c7cb0aafd364acdeb906f02d4375792", size = 6314921, upload-time = "2026-11-02T08:20:18.524Z" },
+    { url = "https://files.pythonhosted.org/packages/fb/b7/7f1c0ef7f203efe35ca0f3b501c375870b96aa65910df265d164c2245a8d/agnix-0.60.3-py3-none-win_amd64.whl", hash = "sha256:cf85dd4813609902de8c03a6e9f52d49cff99dd91e5e0a31216109621d60ced4", size = 6529142, upload-time = "2026-11-02T08:20:19.965Z" },
 ]
 
 [[package]]

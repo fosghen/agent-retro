@@ -16,6 +16,7 @@ agent-retro = "agent_retro.cli:main"
 
 [dependency-groups]
 dev = [
+    "agnix==0.60.3",
     "bandit>=1.8,<2",
     "mypy>=1.15,<2",
     "pip-audit>=2.8,<3",
