@@ -53,8 +53,12 @@ class ProposalStoreInitializationTests(unittest.TestCase):
 
         with sqlite3.connect(self.path) as connection:
             counts = tuple(
-                connection.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
-                for table in ("proposals", "revisions", "events")
+                connection.execute(query).fetchone()[0]
+                for query in (
+                    "SELECT count(*) FROM proposals",
+                    "SELECT count(*) FROM revisions",
+                    "SELECT count(*) FROM events",
+                )
             )
         self.assertEqual(counts, (1, 1, 1))
 
@@ -72,7 +76,8 @@ class ProposalStoreInitializationTests(unittest.TestCase):
         class BrokenStore(ProposalStore):
             def _migrate_v1(self, connection: sqlite3.Connection) -> None:
                 super()._migrate_v1(connection)
-                raise RuntimeError("injected migration failure")
+                message = "injected migration failure"
+                raise RuntimeError(message)
 
         with self.assertRaises(RuntimeError):
             BrokenStore(self.path).initialize()

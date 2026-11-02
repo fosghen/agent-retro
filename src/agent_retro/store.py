@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
+from dataclasses import asdict
 from pathlib import Path  # noqa: TC003 -- public constructor accepts Path.
+
+from agent_retro.models import Proposal, StatusEvent  # noqa: TC001 -- public API types.
 
 STORE_VERSION = 1
 
@@ -48,3 +52,37 @@ class ProposalStore:
             "previous TEXT NOT NULL, current TEXT NOT NULL, occurred_at TEXT NOT NULL)"
         )
         connection.execute(f"PRAGMA user_version = {STORE_VERSION}")
+
+    def save(self, proposal: Proposal, event: StatusEvent) -> None:
+        """Atomically store one proposal revision and its append-only event."""
+        if event.fingerprint != proposal.fingerprint or event.current != proposal.status:
+            message = "event must describe the persisted proposal state"
+            raise ValueError(message)
+        payload = json.dumps(asdict(proposal.revision), sort_keys=True)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute(
+                "INSERT INTO proposals VALUES (?, ?, ?, ?) "
+                "ON CONFLICT(fingerprint) DO UPDATE SET schema_version=excluded.schema_version, "
+                "status=excluded.status, current_revision=excluded.current_revision",
+                (
+                    proposal.fingerprint,
+                    proposal.schema_version,
+                    proposal.status.value,
+                    proposal.revision.number,
+                ),
+            )
+            connection.execute(
+                "INSERT OR IGNORE INTO revisions VALUES (?, ?, ?)",
+                (proposal.fingerprint, proposal.revision.number, payload),
+            )
+            connection.execute(
+                "INSERT INTO events (fingerprint, previous, current, occurred_at) "
+                "VALUES (?, ?, ?, ?)",
+                (
+                    event.fingerprint,
+                    event.previous.value,
+                    event.current.value,
+                    event.occurred_at,
+                ),
+            )
