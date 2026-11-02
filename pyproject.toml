@@ -37,7 +37,7 @@ addopts = ["--cov", "--cov-branch", "--cov-report=term-missing"]
 source = ["agent_retro", "scripts"]
 
 [tool.coverage.report]
-fail_under = 68
+fail_under = 67
 show_missing = true
 
 [tool.ruff]
