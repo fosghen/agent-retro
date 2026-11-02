@@ -8,6 +8,7 @@ import sys
 
 MAX_LINES = 50
 MAX_COMMITS = 5
+GENERATED_EXCLUSIONS = frozenset({"uv.lock"})
 
 
 class ChangeLimitError(ValueError):
@@ -21,6 +22,8 @@ def count_lines(numstat: str) -> int:
         additions, deletions, _path = row.split("\t", 2)
         if "-" in (additions, deletions):
             raise ChangeLimitError("binary changes are forbidden")
+        if _path in GENERATED_EXCLUSIONS:
+            continue
         total += int(additions) + int(deletions)
     return total
 

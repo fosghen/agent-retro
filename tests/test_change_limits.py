@@ -24,6 +24,13 @@ class ChangeLimitTests(unittest.TestCase):
         with self.assertRaisesRegex(ChangeLimitError, "binary"):
             count_lines("-\t-\tasset.bin")
 
+    def test_only_generated_root_lock_is_excluded(self) -> None:
+        self.assertEqual(count_lines("500\t500\tuv.lock"), 0)
+        with self.assertRaises(ChangeLimitError):
+            check("feature/topic", {"large": "51\t0\tnested/uv.lock"})
+        with self.assertRaises(ChangeLimitError):
+            count_lines("-\t-\tuv.lock")
+
 
 if __name__ == "__main__":
     unittest.main()
