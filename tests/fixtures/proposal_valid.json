@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "fingerprint": "workflow:retro:scope",
+  "status": "new",
+  "revision": {
+    "number": 1,
+    "title": "Bound transcript evidence",
+    "rationale": "Avoid retaining raw session content",
+    "target": "agent-retro",
+    "evidence": [{"source_hash": "sha256:abc", "excerpt": "bounded"}]
+  }
+}
