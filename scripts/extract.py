@@ -115,6 +115,23 @@ def _normalize_codex_record(record):
             "version": payload.get("cli_version"),
             "timestamp": timestamp or payload.get("timestamp"),
         }
+    if record.get("type") == "token_usage_record":
+        usage = payload.get("usage") or {}
+        cached = usage.get("cached_input_tokens", 0) or 0
+        total_input = usage.get("input_tokens", 0) or 0
+        return {
+            "timestamp": timestamp,
+            "message": {
+                "role": "assistant",
+                "content": [],
+                "usage": {
+                    "input_tokens": max(0, total_input - cached),
+                    "output_tokens": usage.get("output_tokens", 0) or 0,
+                    "cache_creation_input_tokens": 0,
+                    "cache_read_input_tokens": cached,
+                },
+            },
+        }
     if record.get("type") != "response_item":
         return {"timestamp": timestamp}
     if payload.get("type") == "message":
@@ -255,6 +272,8 @@ def parse_ts(ts_str):
 def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
     """Main extraction pipeline using streaming — processes line-by-line."""
 
+    transcript_format = detect_transcript_format(jsonl_path)
+
     # Session metadata
     session = {
         "session_id": None,
@@ -265,6 +284,7 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
         "end_time": None,
         "duration_seconds": None,
         "branches_seen": set(),
+        "agent": transcript_format,
     }
 
     # Token totals
@@ -472,12 +492,14 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
     session["branches_seen"] = sorted(session["branches_seen"])
 
     # Compute cost
-    cost = (
-        tokens_total["input_tokens"] / 1_000_000 * PRICE_PER_M["input"]
-        + tokens_total["output_tokens"] / 1_000_000 * PRICE_PER_M["output"]
-        + tokens_total["cache_creation_input_tokens"] / 1_000_000 * PRICE_PER_M["cache_create"]
-        + tokens_total["cache_read_input_tokens"] / 1_000_000 * PRICE_PER_M["cache_read"]
-    )
+    cost = None
+    if transcript_format == "claude":
+        cost = (
+            tokens_total["input_tokens"] / 1_000_000 * PRICE_PER_M["input"]
+            + tokens_total["output_tokens"] / 1_000_000 * PRICE_PER_M["output"]
+            + tokens_total["cache_creation_input_tokens"] / 1_000_000 * PRICE_PER_M["cache_create"]
+            + tokens_total["cache_read_input_tokens"] / 1_000_000 * PRICE_PER_M["cache_read"]
+        )
 
     # Attach result sizes to tool calls
     for call in tool_calls:
@@ -525,7 +547,7 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
         "tokens": {
             "total": tokens_total,
             "turn_count": turn_count,
-            "estimated_cost_usd": round(cost, 4),
+            "estimated_cost_usd": round(cost, 4) if cost is not None else None,
         },
         "agents": agents,
         "skills": skills,
