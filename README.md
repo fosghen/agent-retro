@@ -59,6 +59,20 @@ The skill will:
 5. Propose concrete improvements
 6. Walk you through each proposal for approval
 
+### Daily Codex retrospective on macOS
+
+Install the optional LaunchAgent from a local clone:
+
+```bash
+./scripts/install_launchd.sh
+```
+
+It runs at 09:00 local time and analyzes only the previous day's Codex sessions.
+The background Codex process uses a read-only sandbox and writes its final
+Markdown report to `~/.codex/worklog/retros/YYYY-MM-DD-daily.md`. Scheduler logs
+stay local under `~/.codex/logs/`; session transcripts are never copied into the
+repository.
+
 ### Extraction script standalone
 
 The Python extraction script can be used independently:
