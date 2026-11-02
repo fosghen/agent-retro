@@ -13,5 +13,8 @@ directly to `main`. Each commit may contain at most 50 changed lines (additions
 plus deletions), binary changes are forbidden, and each pull request may contain
 at most 5 commits. Never bypass configured hooks with `--no-verify`.
 
-Before editing, reconcile the live PR chain through GitHub MCP. Keep reports
-concise and distinguish observed results from assumptions or planned work.
+Before editing, reconcile live pull request and issue state through the
+GitHub REST API with `gh api`. Live GitHub state is authoritative over stale local refs
+or prior reports. Treat commits, pushes, pull request mutations, merges, and
+issue mutations as separate authorization boundaries. Keep reports concise and
+distinguish observed results from assumptions or planned work.
