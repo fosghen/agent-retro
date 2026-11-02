@@ -4,19 +4,26 @@ Audit date: 2026-11-02, using repository configuration and clean-checkout checks
 
 ## Current enforcement
 
-- CI and pre-commit configuration run 140 unit tests.
-- CI rejects over five commits per PR, over 50 changed lines, and binaries.
-- GitHub Actions use commit-pinned official actions and read-only permissions.
-- Compilation, shell/plist syntax, tests, and skill validation pass manually.
+- Pull-request CI rejects more than five commits, commits over 50 changed lines,
+  binary changes, and changes made directly on a protected branch name.
+- CI installs the locked Python 3.12 development environment, runs pytest with
+  branch coverage and a 67% minimum, scans source with Bandit, audits locked
+  dependencies with pip-audit, and smoke-tests the installed CLI.
+- The pre-commit configuration runs the same change-policy, pytest, Bandit, and
+  pip-audit commands. Hook installation is not automated or verified yet.
+- CI also runs the security checks every Monday at 05:23 UTC. GitHub Actions use
+  commit-pinned actions and read-only repository permissions.
 
 ## Gaps observed
 
-- No formatter, linter, typing, coverage, security, lock, or build gate exists.
-- The local pre-commit hook is not installed, so its configuration is advisory.
-- `main` has no branch protection or required status check; direct pushes and
-  merges with failing or absent CI remain possible.
-- GitHub permits unpinned third-party actions globally, although none exist now.
-- CI tests only Python 3.12 while the README claims Python 3.8+ compatibility.
+- Ruff formatting and linting are not enforced ([#9](https://github.com/fosghen/agent-retro/issues/9)).
+- Strict mypy is not enforced ([#10](https://github.com/fosghen/agent-retro/issues/10)).
+- There is no single local gate or verified hook bootstrap
+  ([#13](https://github.com/fosghen/agent-retro/issues/13)).
+- `main` has no branch protection or required `quality` status check
+  ([#14](https://github.com/fosghen/agent-retro/issues/14)).
+- Agent configuration lacks structural validation
+  ([#46](https://github.com/fosghen/agent-retro/issues/46)).
 
 ## Target gate
 
