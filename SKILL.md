@@ -17,9 +17,9 @@ The full conversation lives in a JSONL file on disk — including tool calls, ag
 
 ### Find the current session
 
-The session file links a running process to its transcript. But session files are keyed by PID and may be cleaned up when processes end, so use a two-step approach with verification.
+Select the discovery flow for the active agent, then verify the candidate before analysis.
 
-**Step A: Try the sessions directory first**
+**Claude Code:** try the sessions directory first.
 ```bash
 ls -t ~/.claude/sessions/*.json | head -5
 ```
@@ -32,14 +32,19 @@ Read the most recent file(s). Match by `cwd` (should equal current working direc
 
 Where `<encoded-cwd>` replaces `/` with `-` (e.g., `/Users/foo/dev/myproject` → `-Users-foo-dev-myproject`).
 
-**Step B: If no session file matches** (PID rotated, file cleaned up), fall back to the most recently modified `.jsonl` in the project directory:
+If no Claude session file matches, use the most recently modified project transcript:
 ```bash
 ls -t ~/.claude/projects/<encoded-cwd>/*.jsonl | head -3
 ```
 
-**Step C: Verify you have the right file.** Use `--metadata-only` for cheap verification — it reads only the first/last 64KB of the file (no full parse):
+**OpenAI Codex:** list recent rollout files, then prefer candidates whose metadata `cwd` matches the current working directory:
 ```bash
-python3 ${CLAUDE_SKILL_DIR}/scripts/extract.py <candidate.jsonl> --metadata-only
+find ~/.codex/sessions -name '*.jsonl' -type f -print | tail -20
+```
+
+**Verify the candidate.** Use `--metadata-only` for cheap verification:
+```bash
+python3 <agent-retro-dir>/scripts/extract.py <candidate.jsonl> --metadata-only
 ```
 
 This returns session_id, cwd, git_branch, first_prompt, timestamps, and file size. Check `first_prompt` matches what was said at the start of the conversation.
@@ -49,7 +54,7 @@ If it doesn't match, try the next most recent file. If none match, state this in
 ### Run extraction
 
 ```bash
-python3 ${CLAUDE_SKILL_DIR}/scripts/extract.py <path-to-session.jsonl> --summary
+python3 <agent-retro-dir>/scripts/extract.py <path-to-session.jsonl> --summary
 ```
 
 Use `--summary` to get compact output (tool counts only, no individual call listings). If you need to drill into specific tool calls later, re-run without `--summary`.
