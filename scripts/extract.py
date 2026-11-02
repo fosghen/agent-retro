@@ -130,6 +130,18 @@ def _normalize_codex_record(record):
             "timestamp": timestamp,
             "message": {"role": "assistant", "content": [_codex_tool_use(payload)]},
         }
+    if payload.get("type") in ("custom_tool_call_output", "function_call_output"):
+        return {
+            "timestamp": timestamp,
+            "message": {
+                "role": "user",
+                "content": [{
+                    "type": "tool_result",
+                    "tool_use_id": payload.get("call_id", ""),
+                    "content": payload.get("output", ""),
+                }],
+            },
+        }
     return {"timestamp": timestamp}
 
 
@@ -346,7 +358,7 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
                     elif name == "Skill":
                         call_summary["skill_name"] = tool_input.get("skill", "")
                         call_summary["skill_args"] = tool_input.get("args", "")
-                    elif name == "Bash":
+                    elif name in ("Bash", "exec", "exec_command"):
                         call_summary["command"] = tool_input.get("command", "")[:300]
                     elif name in ("Read", "Write", "Edit"):
                         call_summary["file_path"] = tool_input.get("file_path", "")
@@ -376,7 +388,7 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
                             files["edited"].add(fp)
 
                     # Track git activity from bash commands
-                    if name == "Bash":
+                    if name in ("Bash", "exec", "exec_command"):
                         cmd = tool_input.get("command", "")
                         if "git commit" in cmd:
                             commits.append({"command": cmd[:200], "timestamp": ts})

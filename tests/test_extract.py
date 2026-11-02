@@ -112,9 +112,29 @@ class TestMetadataOnly(unittest.TestCase):
 
 
 class TestCodexSession(unittest.TestCase):
+    def setUp(self):
+        self.result = load_fixture_result("codex_session.jsonl")
+
     def test_format_detection(self):
         path = str(FIXTURES_DIR / "codex_session.jsonl")
         self.assertEqual(extract.detect_transcript_format(path), "codex")
+
+    def test_session_and_messages(self):
+        self.assertEqual(self.result["session"]["session_id"], "codex-session-123")
+        assistant = [item for item in self.result["conversation_arc"]
+                     if item["role"] == "assistant"]
+        self.assertEqual(len(assistant), 2)
+
+    def test_tool_calls_and_results_are_correlated(self):
+        self.assertEqual(self.result["tools"]["counts"]["exec"], 1)
+        call = next(item for item in self.result["tools"]["calls"]
+                    if item["name"] == "exec")
+        self.assertEqual(call["command"], "git status --short")
+        self.assertGreater(call["result_size_bytes"], 0)
+
+    def test_subagent_dispatch_is_normalized(self):
+        self.assertEqual(self.result["tools"]["counts"]["Agent"], 1)
+        self.assertEqual(self.result["agents"][0]["description"], "history_scan")
 
 
 # ---------------------------------------------------------------------------
