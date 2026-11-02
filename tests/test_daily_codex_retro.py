@@ -11,10 +11,10 @@ class DailyCodexRetroTests(unittest.TestCase):
         path = session_dir(Path("/home/test"), date(2026, 11, 2))
         self.assertEqual(path, Path("/home/test/.codex/sessions/2026/11/02"))
 
-    @patch("scripts.daily_codex_retro.shutil.which", return_value="/bin/codex")
-    def test_command_is_read_only_and_writes_requested_report(self, _which) -> None:
-        report = Path("/tmp/retro.md")
-        result = command(Path("/home/test"), date(2026, 11, 2), report)
+    def test_command_is_read_only_and_writes_requested_report(self) -> None:
+        report = Path("/reports/retro.md")
+        with patch("scripts.daily_codex_retro.shutil.which", return_value="/bin/codex"):
+            result = command(Path("/home/test"), date(2026, 11, 2), report)
         self.assertEqual(result[0:2], ["/bin/codex", "exec"])
         self.assertIn("read-only", result)
         self.assertIn(str(report), result)

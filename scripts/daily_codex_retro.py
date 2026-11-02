@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 
@@ -18,7 +18,8 @@ def command(home: Path, day: date, report: Path) -> list[str]:
     """Build the non-interactive, read-only Codex invocation."""
     codex = shutil.which("codex")
     if codex is None:
-        raise RuntimeError("codex CLI is unavailable")
+        message = "codex CLI is unavailable"
+        raise RuntimeError(message)
     prompt = (
         "Use the agent-retro skill to analyze only Codex sessions from "
         f"{session_dir(home, day)}. Identify repeated workflows and propose the "
@@ -26,22 +27,32 @@ def command(home: Path, day: date, report: Path) -> list[str]:
         "Return a concise Markdown report with evidence and no transcript excerpts."
     )
     return [
-        codex, "exec", "--skip-git-repo-check", "--sandbox", "read-only",
-        "--output-last-message", str(report), "--cd", str(home), prompt,
+        codex,
+        "exec",
+        "--skip-git-repo-check",
+        "--sandbox",
+        "read-only",
+        "--output-last-message",
+        str(report),
+        "--cd",
+        str(home),
+        prompt,
     ]
 
 
 def main() -> int:
     """Write yesterday's retrospective when session files exist."""
     home = Path.home()
-    day = date.today() - timedelta(days=1)
+    day = datetime.now(tz=UTC).astimezone().date() - timedelta(days=1)
     source = session_dir(home, day)
     if not any(source.glob("*.jsonl")):
         return 0
     reports = home / ".codex" / "worklog" / "retros"
     reports.mkdir(parents=True, exist_ok=True)
     report = reports / f"{day.isoformat()}-daily.md"
-    subprocess.run(command(home, day, report), check=True)
+    subprocess.run(  # noqa: S603 -- executable is resolved with shutil.which
+        command(home, day, report), check=True
+    )
     return 0
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 import subprocess
 import sys
 
@@ -21,7 +22,8 @@ def count_lines(numstat: str) -> int:
     for row in numstat.splitlines():
         additions, deletions, _path = row.split("\t", 2)
         if "-" in (additions, deletions):
-            raise ChangeLimitError("binary changes are forbidden")
+            message = "binary changes are forbidden"
+            raise ChangeLimitError(message)
         if _path in GENERATED_EXCLUSIONS:
             continue
         total += int(additions) + int(deletions)
@@ -31,18 +33,27 @@ def count_lines(numstat: str) -> int:
 def check(branch: str, commits: dict[str, str]) -> None:
     """Validate the branch, PR commit count, and every commit size."""
     if branch in {"main", "master"}:
-        raise ChangeLimitError(f"commits on {branch!r} are forbidden")
+        message = f"commits on {branch!r} are forbidden"
+        raise ChangeLimitError(message)
     if len(commits) > MAX_COMMITS:
-        raise ChangeLimitError(f"PR has {len(commits)} commits; maximum is {MAX_COMMITS}")
+        message = f"PR has {len(commits)} commits; maximum is {MAX_COMMITS}"
+        raise ChangeLimitError(message)
     for commit, numstat in commits.items():
         lines = count_lines(numstat)
         if lines > MAX_LINES:
-            raise ChangeLimitError(f"commit {commit} has {lines} changed lines; maximum is 50")
+            message = f"commit {commit} has {lines} changed lines; maximum is 50"
+            raise ChangeLimitError(message)
 
 
 def git(*args: str) -> str:
     """Run Git and return stripped standard output."""
-    result = subprocess.run(["git", *args], check=True, capture_output=True, text=True)
+    executable = shutil.which("git")
+    if executable is None:
+        message = "Git executable is unavailable"
+        raise RuntimeError(message)
+    result = subprocess.run(  # noqa: S603 -- resolved trusted Git executable
+        [executable, *args], check=True, capture_output=True, text=True
+    )
     return result.stdout.strip()
 
 
@@ -60,7 +71,7 @@ def main() -> int:
     try:
         check(branch, commits)
     except ChangeLimitError as error:
-        print(f"change policy failed: {error}", file=sys.stderr)
+        print(f"change policy failed: {error}", file=sys.stderr)  # noqa: T201 -- CLI output
         return 1
     return 0
 
