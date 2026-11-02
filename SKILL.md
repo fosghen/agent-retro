@@ -1,13 +1,13 @@
 ---
 name: agent-retro
 description: Run a conversation retrospective — analyze what happened in this session, what worked, what didn't, and propose concrete improvements. Use when the user says "retro", "retrospective", "what happened in this session", "session review", "what did we do", "analyze this conversation", or when wrapping up a long session and wanting to capture lessons. Especially useful after using a skill you're developing — identifies what can be improved about the skill, rules, setup, or process.
-compatibility: Requires Claude Code. Reads session transcripts from ~/.claude/projects/ (JSONL format). Python 3.8+ for the extraction script (stdlib only). Other agents are on the roadmap.
 metadata:
   author: giannimassi
-  version: "0.1.0"
+  version: "0.2.0"
+  compatibility: Supports Claude Code transcripts in ~/.claude/projects/ and OpenAI Codex transcripts in ~/.codex/sessions/. Python 3.8+.
 ---
 
-# /retro — Conversation Retrospective
+# Agent Session Retrospective
 
 Analyze the current session end-to-end: what happened, what it produced, what worked, what didn't, and what to improve. The output is a structured retro file plus a set of proposed actions you walk through with the user.
 
