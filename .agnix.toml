@@ -1,0 +1,12 @@
+tools = ["codex"]
+
+# Synthetic transcript paths are test data, not agent configuration.
+exclude = ["tests/**"]
+
+[spec_revisions]
+agent_skills_spec = "1.0"
+
+# The repository root is also the packaged skill, so its project README is intentional.
+[[overrides]]
+paths = ["SKILL.md"]
+disabled_rules = ["CX-SK-007"]
