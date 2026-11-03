@@ -5,13 +5,18 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
+from datetime import date
 from enum import StrEnum
+from pathlib import PurePosixPath
 
 SCHEMA_VERSION = 1
 MAX_EXCERPT_CHARS = 500
 MAX_PROPOSAL_EVIDENCE = 5
 MAX_SOURCE_HASH_CHARS = 128
 MAX_STRUCTURED_TEXT_CHARS = 1000
+MAX_RUN_DETAIL_CHARS = 500
+MAX_COMPLETED_AT_CHARS = 100
+MAX_RUN_OUTCOMES = 100
 
 
 class SchemaError(ValueError):
@@ -29,6 +34,24 @@ class ProposalStatus(StrEnum):
     IMPLEMENTED = "implemented"
     FAILED = "failed"
 
+
+class SessionOutcomeStatus(StrEnum):
+    """Privacy-safe result of processing one local session."""
+
+    ANALYZED = "analyzed"
+    SKIPPED = "skipped"
+    FAILED = "failed"
+
+
+@dataclass(frozen=True)
+class DailySessionOutcome:
+    """Bounded derived metadata for one session, never transcript content."""
+
+    session_hash: str
+    status: SessionOutcomeStatus
+    detail: str
+    retryable: bool = False
+    log_ref: str | None = None
 
 @dataclass(frozen=True)
 class EvidenceReference:

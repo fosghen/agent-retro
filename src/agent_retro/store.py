@@ -23,7 +23,7 @@ from agent_retro.models import (
     proposal_from_mapping,
 )
 
-STORE_VERSION = 3
+STORE_VERSION = 4
 PROMOTION_OCCURRENCES = 2
 MAX_DECISION_REASON_CHARS = 1000
 
