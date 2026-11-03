@@ -208,6 +208,51 @@ class ProposalStore:
             ).fetchall()
         return [self._daily_outcome(row) for row in rows]
 
+    def _digest_snapshot(
+        self, connection: sqlite3.Connection
+    ) -> tuple[int, int, tuple[DailyRun, ...], tuple[tuple[str, str, str], ...]]:
+        cursor_row = connection.execute(
+            "SELECT run_id, event_id FROM digest_cursor WHERE singleton = 1"
+        ).fetchone()
+        maxima = connection.execute(
+            "SELECT coalesce((SELECT max(id) FROM daily_runs), 0), "
+            "coalesce((SELECT max(id) FROM events), 0)"
+        ).fetchone()
+        if cursor_row is None or any(
+            not isinstance(value, int) or isinstance(value, bool) or not 0 <= value <= maximum
+            for value, maximum in zip(cursor_row, maxima, strict=True)
+        ):
+            raise SchemaError("invalid stored digest cursor")  # noqa: EM101, TRY003
+        run_cursor, event_cursor = cursor_row
+        run_rows = connection.execute(
+            "SELECT id, run_date, completed_at FROM daily_runs WHERE id > ? ORDER BY id",
+            (run_cursor,),
+        ).fetchall()
+        runs = []
+        for run_id, run_date, completed_at in run_rows:
+            rows = connection.execute(
+                "SELECT session_hash, status, detail, retryable, log_ref "
+                "FROM daily_outcomes WHERE run_id = ? ORDER BY rowid",
+                (run_id,),
+            ).fetchall()
+            outcomes = tuple(self._daily_outcome(row) for row in rows)
+            runs.append(DailyRun(str(run_date), str(completed_at), outcomes))
+        event_rows = connection.execute(
+            "SELECT id, fingerprint, previous, current FROM events WHERE id > ? ORDER BY id",
+            (event_cursor,),
+        ).fetchall()
+        changes = tuple(
+            (
+                str(fingerprint),
+                ProposalStatus(str(previous)).value,
+                ProposalStatus(str(current)).value,
+            )
+            for _, fingerprint, previous, current in event_rows
+        )
+        run_id = int(run_rows[-1][0]) if run_rows else int(run_cursor)
+        event_id = int(event_rows[-1][0]) if event_rows else int(event_cursor)
+        return run_id, event_id, tuple(runs), changes
+
     def save(self, proposal: Proposal, event: StatusEvent) -> None:
         """Atomically store one proposal revision and its append-only event."""
         if event.fingerprint != proposal.fingerprint or event.current != proposal.status:

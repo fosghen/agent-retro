@@ -11,3 +11,8 @@ from agent_retro.store import ProposalStore
 def analyzed_run() -> DailyRun:
     outcome = DailySessionOutcome("session-a", SessionOutcomeStatus.ANALYZED, "derived")
     return DailyRun("2026-11-03", "2026-11-03T09:00:00Z", (outcome,))
+
+
+class DigestCursorTests(unittest.TestCase):
+    def setUp(self) -> None:
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
