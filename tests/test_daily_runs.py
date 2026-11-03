@@ -21,3 +21,14 @@ class DailyRunSchemaTests(unittest.TestCase):
         self.path = Path(temporary.name) / "state.sqlite3"
         self.store = ProposalStore(self.path)
         self.store.initialize()
+
+    def test_run_rejects_invalid_dates_and_duplicate_sessions(self) -> None:
+        outcome = DailySessionOutcome(
+            "sha256:session-a", SessionOutcomeStatus.ANALYZED, "validated"
+        )
+        with self.assertRaises(SchemaError):
+            DailyRun("2026-02-30", "now", ())
+        with self.assertRaises(SchemaError):
+            DailyRun("2026-11-03", "now", (outcome, outcome))
+        with self.assertRaises(SchemaError):
+            DailyRun("2026-11-03", "now", (outcome,) * (MAX_RUN_OUTCOMES + 1))

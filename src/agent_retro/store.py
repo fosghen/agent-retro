@@ -58,6 +58,9 @@ class ProposalStore:
                 version = 2
             if version == STORE_VERSION - 1:
                 self._migrate_v3(connection)
+                version = 3
+            if version == STORE_VERSION - 1:
+                self._migrate_v4(connection)
 
     def _migrate_v1(self, connection: sqlite3.Connection) -> None:
         connection.execute(

@@ -53,6 +53,41 @@ class DailySessionOutcome:
     retryable: bool = False
     log_ref: str | None = None
 
+    def __post_init__(self) -> None:
+        """Reject unbounded identifiers, details, and unsafe log references."""
+        if (
+            not isinstance(self.session_hash, str)
+            or not self.session_hash.strip()
+            or len(self.session_hash) > MAX_SOURCE_HASH_CHARS
+        ):
+            raise SchemaError("invalid session hash")  # noqa: EM101, TRY003
+        if not isinstance(self.status, SessionOutcomeStatus):
+            raise SchemaError("invalid session outcome status")  # noqa: EM101, TRY003
+        if (
+            not isinstance(self.detail, str)
+            or not self.detail.strip()
+            or len(self.detail) > MAX_RUN_DETAIL_CHARS
+        ):
+            raise SchemaError("invalid session outcome detail")  # noqa: EM101, TRY003
+        if not isinstance(self.retryable, bool):
+            raise SchemaError("retryable must be a boolean")  # noqa: EM101, TRY003
+        if self.status is SessionOutcomeStatus.FAILED and not self.log_ref:
+            raise SchemaError("failed sessions require a retry log")  # noqa: EM101, TRY003
+        if self.status is not SessionOutcomeStatus.FAILED and (self.retryable or self.log_ref):
+            raise SchemaError("only failed sessions have retry state")  # noqa: EM101, TRY003
+        if self.log_ref is not None:
+            if not isinstance(self.log_ref, str) or not self.log_ref.strip():
+                raise SchemaError("invalid local log reference")  # noqa: EM101, TRY003
+            path = PurePosixPath(self.log_ref)
+            if (
+                len(self.log_ref) > MAX_RUN_DETAIL_CHARS
+                or self.log_ref != path.as_posix()
+                or path.parent != PurePosixPath("logs")
+                or path.suffix != ".log"
+            ):
+                raise SchemaError("invalid local log reference")  # noqa: EM101, TRY003
+
+
 @dataclass(frozen=True)
 class EvidenceReference:
     """Bounded evidence derived from one source session."""

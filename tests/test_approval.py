@@ -100,6 +100,7 @@ class ApprovalTests(unittest.TestCase):
             ),
         )
         with sqlite3.connect(self.path) as connection:
+            connection.execute("DROP TABLE daily_outcomes")
             connection.execute("DROP TABLE decisions")
             connection.execute("PRAGMA user_version = 2")
 
