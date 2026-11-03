@@ -53,3 +53,36 @@ class RejectDeferTests(unittest.TestCase):
         self.assertEqual(decision, ("rejected", 1, "rejected-at", "Not actionable", None))
         self.assertEqual(event_times, [("rejected-at",), ("new-at",)])
         self.assertEqual(self.counts(), (1, 2))
+
+    def test_invalid_rejection_and_database_failure_are_atomic(self) -> None:
+        for reason in ("", "x" * 1001):
+            with self.subTest(reason=reason), self.assertRaises(SchemaError):
+                self.store.reject(self.proposal.fingerprint, reason, "now")
+        self.assertEqual(self.counts(), (0, 0))
+
+        with sqlite3.connect(self.path) as connection:
+            connection.execute(
+                "CREATE TRIGGER fail_reject BEFORE UPDATE ON proposals "
+                "BEGIN SELECT RAISE(FAIL, 'injected'); END"
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.store.reject(self.proposal.fingerprint, "Valid", "now")
+        self.assertEqual(self.counts(), (0, 0))
+        self.assertEqual(self.store.get(self.proposal.fingerprint).status, ProposalStatus.NEW)
+
+    def test_deferral_requires_iso_date_and_repeated_decision_is_atomic(self) -> None:
+        for until_date in ("", "2026-02-30", "03-11-2026"):
+            with self.subTest(until_date=until_date), self.assertRaises(SchemaError):
+                self.store.defer(self.proposal.fingerprint, until_date, "now")
+        self.assertEqual(self.counts(), (0, 0))
+
+        deferred = self.store.defer(self.proposal.fingerprint, "2026-12-01", "deferred-at")
+        self.assertEqual(deferred.status, ProposalStatus.DEFERRED)
+        with self.assertRaises(SchemaError):
+            self.store.defer(self.proposal.fingerprint, "2026-12-02", "again")
+        with sqlite3.connect(self.path) as connection:
+            row = connection.execute(
+                "SELECT decision, occurred_at, reason, until_date FROM decisions"
+            ).fetchone()
+        self.assertEqual(row, ("deferred", "deferred-at", None, "2026-12-01"))
+        self.assertEqual(self.counts(), (1, 1))
