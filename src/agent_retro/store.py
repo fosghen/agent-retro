@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from dataclasses import asdict, replace
+from datetime import date
 from pathlib import Path  # noqa: TC003 -- public constructor accepts Path.
 
 from agent_retro.models import (
@@ -24,6 +25,7 @@ from agent_retro.models import (
 
 STORE_VERSION = 3
 PROMOTION_OCCURRENCES = 2
+MAX_DECISION_REASON_CHARS = 1000
 
 
 class ProposalStore:
@@ -187,8 +189,42 @@ class ProposalStore:
 
     def approve(self, fingerprint: str, revision: int, occurred_at: str) -> Proposal:
         """Atomically approve and freeze the current reviewed revision."""
+        return self._decide(fingerprint, ProposalStatus.APPROVED, occurred_at, revision=revision)
+
+    def reject(self, fingerprint: str, reason: str, occurred_at: str) -> Proposal:
+        """Atomically reject a proposal with a bounded reason."""
+        if (
+            not isinstance(reason, str)
+            or not reason.strip()
+            or len(reason) > MAX_DECISION_REASON_CHARS
+        ):
+            raise SchemaError("rejection reason must contain at most 1000 characters")  # noqa: EM101, TRY003
+        return self._decide(fingerprint, ProposalStatus.REJECTED, occurred_at, reason=reason)
+
+    def defer(self, fingerprint: str, until_date: str, occurred_at: str) -> Proposal:
+        """Atomically defer a proposal until an ISO calendar date."""
+        try:
+            valid_date = date.fromisoformat(until_date)
+        except (TypeError, ValueError) as error:
+            raise SchemaError("deferral date must use YYYY-MM-DD") from error  # noqa: EM101, TRY003
+        if valid_date.isoformat() != until_date:
+            raise SchemaError("deferral date must use YYYY-MM-DD")  # noqa: EM101, TRY003
+        return self._decide(
+            fingerprint, ProposalStatus.DEFERRED, occurred_at, until_date=until_date
+        )
+
+    def _decide(  # noqa: PLR0913
+        self,
+        fingerprint: str,
+        target: ProposalStatus,
+        occurred_at: str,
+        *,
+        revision: int | None = None,
+        reason: str | None = None,
+        until_date: str | None = None,
+    ) -> Proposal:
         if not isinstance(occurred_at, str) or not occurred_at.strip():
-            raise SchemaError("approval timestamp is required")  # noqa: EM101, TRY003
+            raise SchemaError("decision timestamp is required")  # noqa: EM101, TRY003
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             self._check_version(connection)
