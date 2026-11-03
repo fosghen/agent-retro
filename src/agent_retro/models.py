@@ -52,6 +52,13 @@ class ProposalRevision:
     rationale: str
     target: str
     evidence: tuple[EvidenceReference, ...]
+    problem: str = "Not recorded"
+    affected_workflow: str = "Not recorded"
+    proposed_artifact: str = "Not recorded"
+    expected_benefit: str = "Not recorded"
+    risks: str = "Not recorded"
+    scope: str = "Not recorded"
+    validation: str = "Not recorded"
 
 
 _TRANSITIONS = {
@@ -135,5 +142,17 @@ def proposal_from_mapping(value: object) -> Proposal:
         _text(raw_revision.get("rationale"), "rationale"),
         _text(raw_revision.get("target"), "target"),
         evidence,
+        *(
+            _text(raw_revision.get(field, "Not recorded"), field)
+            for field in (
+                "problem",
+                "affected_workflow",
+                "proposed_artifact",
+                "expected_benefit",
+                "risks",
+                "scope",
+                "validation",
+            )
+        ),
     )
     return Proposal(version, _text(root.get("fingerprint"), "fingerprint"), status, revision)
