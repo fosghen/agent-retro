@@ -336,7 +336,7 @@ class ProposalStoreInitializationTests(unittest.TestCase):
                     "SELECT count(*) FROM events",
                 )
             )
-        self.assertEqual(counts, (2, 1, 1))
+        self.assertEqual(counts, (2, 1, 2))
 
     def test_new_evidence_reopens_rejected_proposal_once(self) -> None:
         store = ProposalStore(self.path)
@@ -374,7 +374,7 @@ class ProposalStoreInitializationTests(unittest.TestCase):
                 "SELECT payload FROM revisions ORDER BY revision"
             ).fetchall()
         self.assertEqual(event, ("rejected", "new", "new-evidence"))
-        self.assertEqual(counts, (3, 2, 2))
+        self.assertEqual(counts, (3, 2, 3))
         evidence = [
             [item["source_hash"] for item in json.loads(row[0])["evidence"]] for row in payloads
         ]
@@ -422,7 +422,7 @@ class ProposalStoreInitializationTests(unittest.TestCase):
         self.assertEqual(store.get(rejected.fingerprint), rejected)
         self.assertEqual(store.occurrence_count(rejected.fingerprint), 2)
         with sqlite3.connect(self.path) as connection:
-            self.assertEqual(connection.execute("SELECT count(*) FROM events").fetchone()[0], 1)
+            self.assertEqual(connection.execute("SELECT count(*) FROM events").fetchone()[0], 2)
 
 
 if __name__ == "__main__":

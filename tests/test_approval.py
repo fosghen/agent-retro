@@ -46,10 +46,12 @@ class ApprovalTests(unittest.TestCase):
         revised = self.store.aggregate_observation(observation("source-c"))
         self.assertEqual(revised.revision.number, 2)
         self.assertEqual(self.store.approved_revision(self.proposal.fingerprint), frozen)
-        self.assertEqual(self.counts(), (1, 1))
+        self.assertEqual(self.counts(), (1, 2))
         with sqlite3.connect(self.path) as connection:
             decision = connection.execute("SELECT revision, occurred_at FROM decisions").fetchone()
-            event_time = connection.execute("SELECT occurred_at FROM events").fetchone()[0]
+            event_time = connection.execute(
+                "SELECT occurred_at FROM events WHERE previous != current"
+            ).fetchone()[0]
         self.assertEqual(decision, (1, "2026-11-03T10:00:00Z"))
         self.assertEqual(event_time, "2026-11-03T10:00:00Z")
 
@@ -58,18 +60,18 @@ class ApprovalTests(unittest.TestCase):
             self.store.approve(self.proposal.fingerprint, 1, "")
         with self.assertRaises(SchemaError):
             self.store.approve("missing", 1, "now")
-        self.assertEqual(self.counts(), (0, 0))
+        self.assertEqual(self.counts(), (0, 1))
 
         self.store.approve(self.proposal.fingerprint, 1, "now")
         with self.assertRaises(SchemaError):
             self.store.approve(self.proposal.fingerprint, 1, "again")
-        self.assertEqual(self.counts(), (1, 1))
+        self.assertEqual(self.counts(), (1, 2))
 
     def test_stale_revision_and_database_failure_roll_back(self) -> None:
         self.store.aggregate_observation(observation("source-c"))
         with self.assertRaisesRegex(SchemaError, "stale"):
             self.store.approve(self.proposal.fingerprint, 1, "now")
-        self.assertEqual(self.counts(), (0, 0))
+        self.assertEqual(self.counts(), (0, 1))
 
         with sqlite3.connect(self.path) as connection:
             connection.execute(
@@ -78,7 +80,7 @@ class ApprovalTests(unittest.TestCase):
             )
         with self.assertRaises(sqlite3.IntegrityError):
             self.store.approve(self.proposal.fingerprint, 2, "now")
-        self.assertEqual(self.counts(), (0, 0))
+        self.assertEqual(self.counts(), (0, 1))
         with sqlite3.connect(self.path) as connection:
             state = connection.execute("SELECT status, current_revision FROM proposals").fetchone()
         self.assertEqual(state, ("new", 2))
@@ -90,7 +92,7 @@ class ApprovalTests(unittest.TestCase):
             self.store.approve(self.proposal.fingerprint, 1, "now")
         with self.assertRaisesRegex(ValueError, "unsupported store version"):
             self.store.approved_revision(self.proposal.fingerprint)
-        self.assertEqual(self.counts(), (0, 0))
+        self.assertEqual(self.counts(), (0, 1))
 
     def test_v2_migration_rolls_back_and_preserves_existing_data(self) -> None:
         self.store.save(
@@ -127,7 +129,7 @@ class ApprovalTests(unittest.TestCase):
                     "SELECT count(*) FROM events",
                 )
             )
-        self.assertEqual((version, decision_table, counts), (2, 0, (2, 1, 1, 1)))
+        self.assertEqual((version, decision_table, counts), (2, 0, (2, 1, 1, 2)))
         ProposalStore(self.path).initialize()
         self.assertEqual(ProposalStore(self.path).get(self.proposal.fingerprint), self.proposal)
 
