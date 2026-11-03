@@ -279,6 +279,28 @@ class ProposalStoreInitializationTests(unittest.TestCase):
     def test_aggregation_rolls_back_observation_on_failure(self) -> None:
         store = ProposalStore(self.path)
         store.initialize()
+        first, second = observation("source-a"), observation("source-b")
+        store.aggregate_observation(first)
+        with sqlite3.connect(self.path) as connection:
+            connection.execute(
+                "CREATE TRIGGER fail_proposal BEFORE INSERT ON proposals "
+                "BEGIN SELECT RAISE(ABORT, 'injected'); END"
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            store.aggregate_observation(second)
+        self.assertEqual(store.occurrence_count(first.fingerprint), 1)
+        self.assertIsNone(store.get(first.fingerprint))
+        with sqlite3.connect(self.path) as connection:
+            connection.execute("DROP TRIGGER fail_proposal")
+        self.assertEqual(store.aggregate_observation(second).revision.number, 1)
+        self.assertEqual(store.occurrence_count(first.fingerprint), 2)
+        with sqlite3.connect(self.path) as connection:
+            counts = (
+                connection.execute("SELECT count(*) FROM proposals").fetchone()[0],
+                connection.execute("SELECT count(*) FROM revisions").fetchone()[0],
+            )
+        self.assertEqual(counts, (1, 1))
+
 
 if __name__ == "__main__":
     unittest.main()
