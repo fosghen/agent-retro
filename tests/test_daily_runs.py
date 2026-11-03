@@ -32,3 +32,15 @@ class DailyRunSchemaTests(unittest.TestCase):
             DailyRun("2026-11-03", "now", (outcome, outcome))
         with self.assertRaises(SchemaError):
             DailyRun("2026-11-03", "now", (outcome,) * (MAX_RUN_OUTCOMES + 1))
+
+    def test_models_accept_only_bounded_privacy_safe_metadata(self) -> None:
+        failed = daily_session_outcome_from_mapping(
+            {
+                "session_hash": "sha256:session-a",
+                "status": "failed",
+                "detail": "analyzer unavailable",
+                "retryable": False,
+                "log_ref": "logs/2026-11-03-session-a.log",
+            }
+        )
+        self.assertIsInstance(DailyRun("2026-11-03", "2026-11-03T09:00:00Z", (failed,)), DailyRun)

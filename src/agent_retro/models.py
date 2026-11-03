@@ -89,6 +89,41 @@ class DailySessionOutcome:
 
 
 @dataclass(frozen=True)
+class DailyRun:
+    """One completed daily analysis run with privacy-safe outcomes."""
+
+    run_date: str
+    completed_at: str
+    outcomes: tuple[DailySessionOutcome, ...]
+
+    def __post_init__(self) -> None:
+        """Require an ISO date, bounded timestamp, and unique sessions."""
+        if not isinstance(self.run_date, str):
+            raise SchemaError("run date must use YYYY-MM-DD")  # noqa: EM101, TRY003
+        try:
+            parsed = date.fromisoformat(self.run_date)
+        except ValueError as error:
+            raise SchemaError("run date must use YYYY-MM-DD") from error  # noqa: EM101, TRY003
+        if parsed.isoformat() != self.run_date:
+            raise SchemaError("run date must use YYYY-MM-DD")  # noqa: EM101, TRY003
+        if (
+            not isinstance(self.completed_at, str)
+            or not self.completed_at.strip()
+            or len(self.completed_at) > MAX_COMPLETED_AT_CHARS
+        ):
+            raise SchemaError("invalid completion timestamp")  # noqa: EM101, TRY003
+        if not isinstance(self.outcomes, tuple) or not all(
+            isinstance(item, DailySessionOutcome) for item in self.outcomes
+        ):
+            raise SchemaError("outcomes must be typed session metadata")  # noqa: EM101, TRY003
+        if len(self.outcomes) > MAX_RUN_OUTCOMES:
+            raise SchemaError("too many session outcomes")  # noqa: EM101, TRY003
+        hashes = [item.session_hash for item in self.outcomes]
+        if len(hashes) != len(set(hashes)):
+            raise SchemaError("duplicate session outcome")  # noqa: EM101, TRY003
+
+
+@dataclass(frozen=True)
 class EvidenceReference:
     """Bounded evidence derived from one source session."""
 
