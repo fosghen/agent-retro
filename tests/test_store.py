@@ -49,7 +49,15 @@ class ProposalStoreInitializationTests(unittest.TestCase):
             ).fetchall()
         self.assertEqual(
             tables,
-            [("decisions",), ("events",), ("occurrences",), ("proposals",), ("revisions",)],
+            [
+                ("daily_outcomes",),
+                ("daily_runs",),
+                ("decisions",),
+                ("events",),
+                ("occurrences",),
+                ("proposals",),
+                ("revisions",),
+            ],
         )
 
     def test_corrupt_database_is_not_replaced(self) -> None:
@@ -141,7 +149,7 @@ class ProposalStoreInitializationTests(unittest.TestCase):
             store.list_proposals()
 
         with sqlite3.connect(self.path) as connection:
-            connection.execute("PRAGMA user_version = 4")
+            connection.execute("PRAGMA user_version = 5")
         with self.assertRaisesRegex(ValueError, "unsupported store version"):
             store.get("fingerprint")
 
@@ -196,7 +204,7 @@ class ProposalStoreInitializationTests(unittest.TestCase):
         store = ProposalStore(self.path)
         store.initialize()
         with sqlite3.connect(self.path) as connection:
-            connection.execute("PRAGMA user_version = 4")
+            connection.execute("PRAGMA user_version = 5")
         with self.assertRaisesRegex(ValueError, "unsupported store version"):
             store.record_observation(observation("source-a"))
         with sqlite3.connect(self.path) as connection:

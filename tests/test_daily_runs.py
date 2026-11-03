@@ -44,3 +44,17 @@ class DailyRunSchemaTests(unittest.TestCase):
             }
         )
         self.assertIsInstance(DailyRun("2026-11-03", "2026-11-03T09:00:00Z", (failed,)), DailyRun)
+
+        base = {"session_hash": "s", "status": "analyzed", "detail": "safe"}
+        invalid = (
+            base | {"session_hash": ""},
+            base | {"status": "failed"},
+            base | {"status": "failed", "retryable": True, "log_ref": "../transcript.log"},
+            base | {"status": "failed", "retryable": True, "log_ref": "logs/./failure.log"},
+            base | {"transcript": "private raw content"},
+        )
+        for value in invalid:
+            with self.subTest(value=value), self.assertRaises(SchemaError):
+                daily_session_outcome_from_mapping(value)
+        with self.assertRaises(SchemaError):
+            DailySessionOutcome("s", SessionOutcomeStatus.SKIPPED, "safe", retryable=True)

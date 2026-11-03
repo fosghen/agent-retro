@@ -361,3 +361,25 @@ def analyzer_candidate_from_mapping(value: object) -> AnalyzerCandidate:
     return AnalyzerCandidate(
         version, observation, *(_bounded_text(root.get(name), name) for name in fields)
     )
+
+
+def daily_session_outcome_from_mapping(value: object) -> DailySessionOutcome:
+    """Validate an untrusted privacy-safe session outcome mapping."""
+    root = _mapping(value, "session outcome")
+    if set(root) - {"session_hash", "status", "detail", "retryable", "log_ref"}:
+        raise SchemaError("session outcome contains unsupported fields")  # noqa: EM101, TRY003
+    try:
+        status = SessionOutcomeStatus(_text(root.get("status"), "status"))
+    except ValueError as error:
+        raise SchemaError("session outcome status is unknown") from error  # noqa: EM101, TRY003
+    retryable = root.get("retryable", False)
+    if not isinstance(retryable, bool):
+        raise SchemaError("retryable must be a boolean")  # noqa: EM101, TRY003
+    log_ref = None if root.get("log_ref") is None else _text(root.get("log_ref"), "log_ref")
+    return DailySessionOutcome(
+        _text(root.get("session_hash"), "session_hash"),
+        status,
+        _text(root.get("detail"), "detail"),
+        retryable,
+        log_ref,
+    )
