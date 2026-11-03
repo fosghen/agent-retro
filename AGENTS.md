@@ -17,9 +17,9 @@ private source. Use synthetic fixtures only.
 
 ## Development state machine
 
-Before editing, reconcile live pull request and issue state through the GitHub
-REST API with `gh api`. Live GitHub state is authoritative over stale local refs
-or prior reports.
+Before editing, reconcile live pull request and issue state through the
+GitHub REST API with `gh api`. Live GitHub state is
+authoritative over stale local refs or prior reports.
 
 Development must follow this order:
 
