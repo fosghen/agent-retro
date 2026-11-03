@@ -262,17 +262,17 @@ class ProposalStoreInitializationTests(unittest.TestCase):
         store.initialize()
         store.aggregate_observation(observation("source-a"))
         promoted = store.aggregate_observation(observation("source-b"))
-        rejected = promoted.transition(ProposalStatus.REJECTED)
+        approved = promoted.transition(ProposalStatus.APPROVED)
         store.save(
-            rejected,
+            approved,
             StatusEvent(
-                1, rejected.fingerprint, ProposalStatus.NEW, ProposalStatus.REJECTED, "now"
+                1, approved.fingerprint, ProposalStatus.NEW, ProposalStatus.APPROVED, "now"
             ),
         )
 
         result = store.aggregate_observation(observation("source-c"))
-        self.assertEqual(result, rejected)
-        self.assertEqual(store.occurrence_count(rejected.fingerprint), 3)
+        self.assertEqual(result, approved)
+        self.assertEqual(store.occurrence_count(approved.fingerprint), 3)
         with sqlite3.connect(self.path) as connection:
             self.assertEqual(connection.execute("SELECT count(*) FROM revisions").fetchone()[0], 1)
 
@@ -301,6 +301,30 @@ class ProposalStoreInitializationTests(unittest.TestCase):
             )
         self.assertEqual(counts, (1, 1))
 
+    def test_rejected_duplicate_stays_suppressed(self) -> None:
+        store = ProposalStore(self.path)
+        store.initialize()
+        store.aggregate_observation(observation("source-a"))
+        promoted = store.aggregate_observation(observation("source-b"))
+        rejected = promoted.transition(ProposalStatus.REJECTED)
+        store.save(
+            rejected,
+            StatusEvent(
+                1, rejected.fingerprint, ProposalStatus.NEW, ProposalStatus.REJECTED, "rejected"
+            ),
+        )
+
+        self.assertEqual(store.aggregate_observation(observation("source-b")), rejected)
+        with sqlite3.connect(self.path) as connection:
+            counts = tuple(
+                connection.execute(query).fetchone()[0]
+                for query in (
+                    "SELECT count(*) FROM occurrences",
+                    "SELECT count(*) FROM revisions",
+                    "SELECT count(*) FROM events",
+                )
+            )
+        self.assertEqual(counts, (2, 1, 1))
 
 if __name__ == "__main__":
     unittest.main()
