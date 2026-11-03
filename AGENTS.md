@@ -17,9 +17,11 @@ private source. Use synthetic fixtures only.
 
 ## Development state machine
 
-Before editing, reconcile live pull request and issue state through the
-GitHub REST API with `gh api`. Live GitHub state is
-authoritative over stale local refs or prior reports.
+Before editing, reconcile live pull request and issue state, the branch, and
+remaining change budgets with
+`uv run --frozen --no-sync python scripts/workflow_status.py`. It reads the
+GitHub REST API through `gh`; live state is authoritative over stale local refs
+or prior reports. Use `gh api` only when the compact status lacks required detail.
 
 Development must follow this order:
 

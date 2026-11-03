@@ -87,3 +87,22 @@ def collect(query: Query = execute) -> dict[str, object]:
             "pr_lines": max(0, MAX_PR_LINES - changed),
         },
     }
+
+
+def encode(status: dict[str, object]) -> str:
+    """Serialize status without presentation whitespace."""
+    return json.dumps(status, separators=(",", ":"), sort_keys=True)
+
+
+def main() -> int:
+    """Print compact status or one actionable error."""
+    try:
+        print(encode(collect()))  # noqa: T201 -- CLI output
+    except (ChangeLimitError, ValueError, WorkflowStatusError) as error:
+        print(f"workflow status failed: {error}", file=sys.stderr)  # noqa: T201
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
