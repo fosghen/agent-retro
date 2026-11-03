@@ -12,12 +12,15 @@ from agent_retro.models import (
     MAX_PROPOSAL_EVIDENCE,
     SCHEMA_VERSION,
     AnalyzerCandidate,
+    DailyRun,
+    DailySessionOutcome,
     EvidenceReference,
     Proposal,
     ProposalObservation,
     ProposalRevision,
     ProposalStatus,
     SchemaError,
+    SessionOutcomeStatus,
     StatusEvent,
     analyzer_candidate_from_mapping,
     proposal_from_mapping,
@@ -107,6 +110,88 @@ class ProposalStore:
             "FOREIGN KEY(run_id) REFERENCES daily_runs(id))"
         )
         connection.execute("PRAGMA user_version = 4")
+
+    def record_daily_run(self, run: DailyRun) -> int:
+        """Atomically persist one privacy-safe daily run summary."""
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            self._check_version(connection)
+            cursor = connection.execute(
+                "INSERT INTO daily_runs (run_date, completed_at) VALUES (?, ?)",
+                (run.run_date, run.completed_at),
+            )
+            if cursor.lastrowid is None:
+                raise RuntimeError("daily run id was not generated")  # noqa: EM101, TRY003
+            run_id = cursor.lastrowid
+            connection.executemany(
+                "INSERT INTO daily_outcomes VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    (
+                        run_id,
+                        item.session_hash,
+                        item.status.value,
+                        item.detail,
+                        item.retryable,
+                        item.log_ref,
+                    )
+                    for item in run.outcomes
+                ),
+            )
+        return run_id
+
+    @staticmethod
+    def _daily_outcome(row: tuple[object, ...]) -> DailySessionOutcome:
+        session_hash, status, detail, retryable, log_ref = row
+        if (
+            not isinstance(session_hash, str)
+            or not isinstance(status, str)
+            or not isinstance(detail, str)
+            or not isinstance(retryable, int)
+            or isinstance(retryable, bool)
+            or retryable not in {0, 1}
+            or (log_ref is not None and not isinstance(log_ref, str))
+        ):
+            raise SchemaError("invalid stored daily outcome")  # noqa: EM101, TRY003
+        return DailySessionOutcome(
+            session_hash,
+            SessionOutcomeStatus(status),
+            detail,
+            bool(retryable),
+            log_ref,
+        )
+
+    def list_daily_runs(self, *, after_id: int = 0) -> list[tuple[int, DailyRun]]:
+        """Return daily runs and their derived outcomes in stable order."""
+        if not isinstance(after_id, int) or isinstance(after_id, bool) or after_id < 0:
+            raise ValueError("after_id must not be negative")  # noqa: EM101, TRY003
+        with self._connect() as connection:
+            self._check_version(connection)
+            runs = connection.execute(
+                "SELECT id, run_date, completed_at FROM daily_runs WHERE id > ? ORDER BY id",
+                (after_id,),
+            ).fetchall()
+            result = []
+            for run_id, run_date, completed_at in runs:
+                rows = connection.execute(
+                    "SELECT session_hash, status, detail, retryable, log_ref "
+                    "FROM daily_outcomes WHERE run_id = ? ORDER BY rowid",
+                    (run_id,),
+                ).fetchall()
+                outcomes = tuple(self._daily_outcome(row) for row in rows)
+                result.append((int(run_id), DailyRun(str(run_date), str(completed_at), outcomes)))
+        return result
+
+    def retryable_failures(self) -> list[DailySessionOutcome]:
+        """Return failed sessions with local logs for a later retry."""
+        with self._connect() as connection:
+            self._check_version(connection)
+            rows = connection.execute(
+                "SELECT o.session_hash, o.status, o.detail, o.retryable, o.log_ref "
+                "FROM daily_outcomes o WHERE o.status = 'failed' AND o.retryable = 1 "
+                "AND o.run_id = (SELECT max(n.run_id) FROM daily_outcomes n "
+                "WHERE n.session_hash = o.session_hash) ORDER BY o.run_id, o.rowid"
+            ).fetchall()
+        return [self._daily_outcome(row) for row in rows]
 
     def save(self, proposal: Proposal, event: StatusEvent) -> None:
         """Atomically store one proposal revision and its append-only event."""
