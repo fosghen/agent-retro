@@ -85,7 +85,7 @@ class ApprovalTests(unittest.TestCase):
 
     def test_forward_store_version_is_never_read_or_mutated(self) -> None:
         with sqlite3.connect(self.path) as connection:
-            connection.execute("PRAGMA user_version = 4")
+            connection.execute("PRAGMA user_version = 5")
         with self.assertRaisesRegex(ValueError, "unsupported store version"):
             self.store.approve(self.proposal.fingerprint, 1, "now")
         with self.assertRaisesRegex(ValueError, "unsupported store version"):
@@ -101,8 +101,8 @@ class ApprovalTests(unittest.TestCase):
         )
         with sqlite3.connect(self.path) as connection:
             connection.execute("DROP TABLE daily_outcomes")
-            connection.execute("DROP TABLE decisions")
             connection.execute("DROP TABLE daily_runs")
+            connection.execute("DROP TABLE decisions")
             connection.execute("PRAGMA user_version = 2")
 
         class BrokenStore(ProposalStore):

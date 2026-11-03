@@ -58,3 +58,33 @@ class DailyRunSchemaTests(unittest.TestCase):
                 daily_session_outcome_from_mapping(value)
         with self.assertRaises(SchemaError):
             DailySessionOutcome("s", SessionOutcomeStatus.SKIPPED, "safe", retryable=True)
+
+    def test_v3_migration_is_atomic_and_excludes_transcript_columns(self) -> None:
+        with sqlite3.connect(self.path) as connection:
+            connection.execute(
+                "INSERT INTO decisions (fingerprint, decision, revision, occurred_at) "
+                "VALUES ('sentinel', 'approved', 1, 'now')"
+            )
+            connection.execute("DROP TABLE daily_outcomes")
+            connection.execute("DROP TABLE daily_runs")
+            connection.execute("PRAGMA user_version = 3")
+
+        class BrokenStore(ProposalStore):
+            def _migrate_v4(self, connection: sqlite3.Connection) -> None:
+                super()._migrate_v4(connection)
+                message = "injected migration failure"
+                raise RuntimeError(message)
+
+        with self.assertRaises(RuntimeError):
+            BrokenStore(self.path).initialize()
+        with sqlite3.connect(self.path) as connection:
+            version = connection.execute("PRAGMA user_version").fetchone()[0]
+            tables = connection.execute(
+                "SELECT name FROM sqlite_master WHERE name LIKE 'daily_%'"
+            ).fetchall()
+            sentinel = connection.execute(
+                "SELECT fingerprint FROM decisions WHERE fingerprint = 'sentinel'"
+            ).fetchone()
+        self.assertEqual((version, tables, sentinel), (3, [], ("sentinel",)))
+
+        self.store.initialize()
