@@ -38,11 +38,7 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
         run: python scripts/check_change_limits.py --branch "$HEAD_BRANCH" --range "$BASE_SHA" "$HEAD_SHA"
-      - name: Run tests
+      - name: Run full quality gate
         run: |
           uv sync --locked --all-groups
-          uv run --frozen --no-sync python scripts/check_agent_config.py
-          uv run --frozen --no-sync pytest
-          uv run --frozen --no-sync bandit -q -r src scripts
-          uv run --frozen --no-sync pip-audit
-          uv run --frozen --no-sync agent-retro --help
+          uv run --frozen --no-sync python scripts/run_quality_gate.py

@@ -5,14 +5,8 @@ repos:
   - repo: local
     hooks:
       - id: change-limits
-        name: branch and 50-line commit limit
+        name: issue branch and logical change limits
         entry: uv run --frozen --no-sync python scripts/check_change_limits.py
-        language: system
-        always_run: true
-        pass_filenames: false
-      - id: tests
-        name: tests with branch coverage
-        entry: uv run --frozen --no-sync pytest
         language: system
         always_run: true
         pass_filenames: false
@@ -22,9 +16,10 @@ repos:
         language: system
         always_run: true
         pass_filenames: false
-      - id: security
-        name: source and dependency security
-        entry: bash -c 'uv run --frozen --no-sync bandit -q -r src scripts && uv run --frozen --no-sync pip-audit'
+      - id: full-quality-gate
+        name: single full publication gate
+        entry: uv run --frozen --no-sync python scripts/run_quality_gate.py
         language: system
         always_run: true
         pass_filenames: false
+        stages: [pre-push]
