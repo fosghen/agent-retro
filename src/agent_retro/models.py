@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from enum import StrEnum
 
 SCHEMA_VERSION = 1
+MAX_EXCERPT_CHARS = 500
+MAX_SOURCE_HASH_CHARS = 128
 
 
 class SchemaError(ValueError):
@@ -31,6 +34,42 @@ class EvidenceReference:
 
     source_hash: str
     excerpt: str
+
+
+@dataclass(frozen=True)
+class ProposalObservation:
+    """One bounded observation contributing to proposal recurrence."""
+
+    intent: str
+    target: str
+    scope: str
+    evidence: EvidenceReference
+
+    def __post_init__(self) -> None:
+        """Reject empty identity fields and unbounded evidence."""
+        for name in ("intent", "target", "scope"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise SchemaError(f"{name} must be a non-empty string")  # noqa: EM102, TRY003
+        source_hash = self.evidence.source_hash
+        excerpt = self.evidence.excerpt
+        if (
+            not isinstance(source_hash, str)
+            or not source_hash.strip()
+            or len(source_hash) > MAX_SOURCE_HASH_CHARS
+        ):
+            raise SchemaError("source_hash must contain at most 128 characters")  # noqa: EM101, TRY003
+        if not isinstance(excerpt, str) or not excerpt.strip() or len(excerpt) > MAX_EXCERPT_CHARS:
+            raise SchemaError("excerpt must contain at most 500 characters")  # noqa: EM101, TRY003
+
+    @property
+    def fingerprint(self) -> str:
+        """Return a stable identity from normalized intent, target, and scope."""
+        identity = "\0".join(
+            " ".join(value.split()).casefold() for value in (self.intent, self.target, self.scope)
+        )
+        digest = hashlib.sha256(identity.encode(), usedforsecurity=False).hexdigest()
+        return f"sha256:{digest}"
 
 
 @dataclass(frozen=True)
