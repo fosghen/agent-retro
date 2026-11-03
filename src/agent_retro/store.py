@@ -297,6 +297,7 @@ class ProposalStore:
                 return current
             if current is not None and current.status not in {
                 ProposalStatus.NEW,
+                ProposalStatus.APPROVED,
                 ProposalStatus.REJECTED,
             }:
                 return current
