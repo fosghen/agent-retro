@@ -231,3 +231,44 @@ class ProposalStore:
                 EvidenceReference(source_hash, excerpt)
                 for _, _, _, source_hash, excerpt in rows[-MAX_PROPOSAL_EVIDENCE:]
             )
+            if current is None:
+                intent, target, scope, _, _ = rows[0]
+                revision = ProposalRevision(
+                    1,
+                    " ".join(intent.split()),
+                    f"Observed in {len(rows)} distinct sources.",
+                    target,
+                    evidence,
+                    problem=intent,
+                    affected_workflow=target,
+                    proposed_artifact=target,
+                    scope=scope,
+                )
+                proposal = Proposal(
+                    SCHEMA_VERSION, observation.fingerprint, ProposalStatus.NEW, revision
+                )
+                connection.execute(
+                    "INSERT INTO proposals VALUES (?, ?, ?, ?)",
+                    (proposal.fingerprint, proposal.schema_version, proposal.status.value, 1),
+                )
+            else:
+                revision = replace(
+                    current.revision,
+                    number=current.revision.number + 1,
+                    rationale=f"Observed in {len(rows)} distinct sources.",
+                    evidence=evidence,
+                )
+                proposal = replace(current, revision=revision)
+                connection.execute(
+                    "UPDATE proposals SET current_revision = ? WHERE fingerprint = ?",
+                    (revision.number, proposal.fingerprint),
+                )
+            connection.execute(
+                "INSERT INTO revisions VALUES (?, ?, ?)",
+                (
+                    proposal.fingerprint,
+                    revision.number,
+                    json.dumps(asdict(revision), sort_keys=True),
+                ),
+            )
+        return proposal

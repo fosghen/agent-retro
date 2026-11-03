@@ -220,6 +220,15 @@ class ProposalStoreInitializationTests(unittest.TestCase):
         with sqlite3.connect(self.path) as connection:
             self.assertEqual(connection.execute("SELECT count(*) FROM proposals").fetchone()[0], 1)
             self.assertEqual(connection.execute("SELECT count(*) FROM revisions").fetchone()[0], 2)
+            payloads = connection.execute(
+                "SELECT payload FROM revisions WHERE fingerprint = ? ORDER BY revision",
+                (promoted.fingerprint,),
+            ).fetchall()
+        evidence = [
+            [item["source_hash"] for item in json.loads(row[0])["evidence"]] for row in payloads
+        ]
+        self.assertEqual(evidence, [["source-a", "source-b"], ["source-a", "source-b", "source-c"]])
+
 
 if __name__ == "__main__":
     unittest.main()
