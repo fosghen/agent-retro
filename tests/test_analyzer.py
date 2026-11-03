@@ -93,5 +93,6 @@ class AnalyzerCandidateTests(unittest.TestCase):
                 self.store.ingest_analyzer_output(value)
             self.assertEqual(self.counts(), (0, 0, 0, 0))
 
+
 if __name__ == "__main__":
     unittest.main()

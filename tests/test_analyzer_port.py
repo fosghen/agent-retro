@@ -65,14 +65,21 @@ class AnalyzerPortTests(unittest.TestCase):
 
         long_excerpt = "x" * 501
         second = FakeAnalyzer(candidate("source-b", "x" * 500))
-        proposal = run_analyzer(second, self.store, "source-b", long_excerpt)
+        proposal = run_analyzer(
+            second, self.store, "source-b", long_excerpt, occurred_at="2026-11-03T09:00:00Z"
+        )
         self.assertEqual(second.inputs, [AnalyzerInput("source-b", "x" * 500)])
         self.assertEqual(len(proposal.revision.evidence), 2)
         with sqlite3.connect(self.store.path) as connection:
             events = connection.execute(
-                "SELECT fingerprint, previous, current FROM events ORDER BY id"
+                "SELECT fingerprint, previous, current, occurred_at FROM events ORDER BY id"
             ).fetchall()
-        self.assertEqual(events, [(proposal.fingerprint, "new", "new")])
+        self.assertEqual(events, [(proposal.fingerprint, "new", "new", "2026-11-03T09:00:00Z")])
+
+        run_analyzer(FakeAnalyzer(candidate("source-c", "three")), self.store, "source-c", "three")
+        run_analyzer(FakeAnalyzer(candidate("source-c", "three")), self.store, "source-c", "three")
+        with sqlite3.connect(self.store.path) as connection:
+            self.assertEqual(connection.execute("SELECT count(*) FROM events").fetchone()[0], 1)
 
     def test_invocation_failure_does_not_mutate_store(self) -> None:
         analyzer = FakeAnalyzer(RuntimeError("offline"))

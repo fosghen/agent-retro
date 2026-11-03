@@ -2,6 +2,7 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from datetime import UTC, datetime
 from pathlib import Path
 
 from agent_retro.models import (
@@ -312,6 +313,38 @@ class ProposalStoreInitializationTests(unittest.TestCase):
                 connection.execute("SELECT count(*) FROM revisions").fetchone()[0],
             )
         self.assertEqual(counts, (1, 1))
+
+    def test_creation_event_failure_rolls_back_promotion_and_retries(self) -> None:
+        store = ProposalStore(self.path)
+        store.initialize()
+        first, second = observation("source-a"), observation("source-b")
+        store.aggregate_observation(first)
+        with sqlite3.connect(self.path) as connection:
+            connection.execute(
+                "CREATE TRIGGER fail_creation BEFORE INSERT ON events "
+                "WHEN NEW.previous = 'new' AND NEW.current = 'new' "
+                "BEGIN SELECT RAISE(ABORT, 'injected'); END"
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            store.aggregate_observation(second)
+        with sqlite3.connect(self.path) as connection:
+            counts = tuple(
+                connection.execute(query).fetchone()[0]
+                for query in (
+                    "SELECT count(*) FROM occurrences",
+                    "SELECT count(*) FROM proposals",
+                    "SELECT count(*) FROM revisions",
+                    "SELECT count(*) FROM events",
+                )
+            )
+            connection.execute("DROP TRIGGER fail_creation")
+        self.assertEqual(counts, (1, 0, 0, 0))
+
+        store.aggregate_observation(second)
+        with sqlite3.connect(self.path) as connection:
+            occurred_at = connection.execute("SELECT occurred_at FROM events").fetchone()[0]
+        parsed = datetime.fromisoformat(occurred_at)
+        self.assertEqual(parsed.utcoffset(), UTC.utcoffset(parsed))
 
     def test_rejected_duplicate_stays_suppressed(self) -> None:
         store = ProposalStore(self.path)
