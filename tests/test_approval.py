@@ -91,3 +91,51 @@ class ApprovalTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unsupported store version"):
             self.store.approved_revision(self.proposal.fingerprint)
         self.assertEqual(self.counts(), (0, 0))
+
+    def test_v2_migration_rolls_back_and_preserves_existing_data(self) -> None:
+        self.store.save(
+            self.proposal,
+            StatusEvent(
+                1, self.proposal.fingerprint, ProposalStatus.NEW, ProposalStatus.NEW, "old"
+            ),
+        )
+        with sqlite3.connect(self.path) as connection:
+            connection.execute("DROP TABLE decisions")
+            connection.execute("PRAGMA user_version = 2")
+
+        class BrokenStore(ProposalStore):
+            def _migrate_v3(self, connection: sqlite3.Connection) -> None:
+                super()._migrate_v3(connection)
+                message = "injected migration failure"
+                raise RuntimeError(message)
+
+        with self.assertRaises(RuntimeError):
+            BrokenStore(self.path).initialize()
+        with sqlite3.connect(self.path) as connection:
+            version = connection.execute("PRAGMA user_version").fetchone()[0]
+            decision_table = connection.execute(
+                "SELECT count(*) FROM sqlite_master WHERE name = 'decisions'"
+            ).fetchone()[0]
+            counts = tuple(
+                connection.execute(query).fetchone()[0]
+                for query in (
+                    "SELECT count(*) FROM occurrences",
+                    "SELECT count(*) FROM proposals",
+                    "SELECT count(*) FROM revisions",
+                    "SELECT count(*) FROM events",
+                )
+            )
+        self.assertEqual((version, decision_table, counts), (2, 0, (2, 1, 1, 1)))
+        ProposalStore(self.path).initialize()
+        self.assertEqual(ProposalStore(self.path).get(self.proposal.fingerprint), self.proposal)
+
+    def test_cli_approves_current_revision(self) -> None:
+        result = main(
+            ["--store", str(self.path), "approve", self.proposal.fingerprint, "--revision", "1"]
+        )
+        self.assertEqual(result, 0)
+        self.assertEqual(self.store.get(self.proposal.fingerprint).status, ProposalStatus.APPROVED)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -172,7 +172,6 @@ class ProposalStore:
             ).fetchone()
         return None if row is None else self._proposal(row)
 
-    def record_observation(self, observation: ProposalObservation) -> bool:
     def approved_revision(self, fingerprint: str) -> ProposalRevision | None:
         """Return the immutable revision frozen by approval."""
         with self._connect() as connection:
@@ -221,6 +220,7 @@ class ProposalStore:
             )
         return approved
 
+    def record_observation(self, observation: ProposalObservation) -> bool:
         """Persist one distinct source observation and report whether it was new."""
         with self._connect() as connection:
             self._check_version(connection)
