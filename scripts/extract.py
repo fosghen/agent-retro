@@ -18,6 +18,13 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from datetime import datetime
 
+from agent_retro.transcript_io import (
+    LITE_READ_BUF_SIZE,
+    detect_transcript_format,
+    read_head_tail,
+    stream_raw_jsonl,
+)
+
 # Approximate pricing per million tokens (Claude Opus 4.6)
 # Update these when Anthropic changes pricing and bump PRICING_LAST_VERIFIED.
 PRICING_LAST_VERIFIED = "2026-04-06"
@@ -29,31 +36,6 @@ PRICE_PER_M = {
 }
 
 SCHEMA_VERSION = "0.1.0"
-
-# Head/tail buffer size for lite reads (matches Claude Code's LITE_READ_BUF_SIZE)
-LITE_READ_BUF_SIZE = 65536
-
-
-def stream_raw_jsonl(path):
-    """Yield parsed records without format-specific normalization."""
-    with open(path) as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                try:
-                    yield json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-
-
-def detect_transcript_format(path):
-    """Detect the transcript producer from its first meaningful record."""
-    for record in stream_raw_jsonl(path):
-        if record.get("type") == "session_meta" and isinstance(record.get("payload"), dict):
-            return "codex"
-        return "claude"
-    return "claude"
-
 
 def _normalize_codex_content(content):
     """Convert Codex text blocks to the shared text-block shape."""
@@ -175,23 +157,6 @@ def stream_jsonl(path):
     transcript_format = detect_transcript_format(path)
     for record in stream_raw_jsonl(path):
         yield _normalize_codex_record(record) if transcript_format == "codex" else record
-
-
-def read_head_tail(path):
-    """Read first and last 64KB of a file. Returns (head_str, tail_str, file_size)."""
-    size = os.path.getsize(path)
-    with open(path, "rb") as f:
-        head_bytes = f.read(LITE_READ_BUF_SIZE)
-        head = head_bytes.decode("utf-8", errors="replace")
-
-        if size <= LITE_READ_BUF_SIZE:
-            return head, head, size
-
-        f.seek(max(0, size - LITE_READ_BUF_SIZE))
-        tail_bytes = f.read(LITE_READ_BUF_SIZE)
-        tail = tail_bytes.decode("utf-8", errors="replace")
-
-    return head, tail, size
 
 
 def extract_json_field(text, key):
