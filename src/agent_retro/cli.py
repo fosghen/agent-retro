@@ -10,10 +10,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from agent_retro import __version__
+from agent_retro.digest import render_daily_digest
 from agent_retro.models import (
     MAX_EXCERPT_CHARS,
     MAX_PROPOSAL_EVIDENCE,
     MAX_SOURCE_HASH_CHARS,
+    DailyRun,
     Proposal,
     ProposalStatus,
 )
@@ -50,6 +52,7 @@ def parser() -> argparse.ArgumentParser:
     defer_parser = commands.add_parser("defer", help="defer a proposal")
     defer_parser.add_argument("proposal_id")
     defer_parser.add_argument("--until", required=True)
+    commands.add_parser("digest", help="print unseen privacy-safe daily changes")
     return result
 
 
@@ -121,12 +124,28 @@ def _defer(store: ProposalStore, proposal_id: str, until_date: str) -> int:
     return 0
 
 
-def main(argv: Sequence[str] | None = None) -> int:  # noqa: PLR0911
+def _digest(store: ProposalStore) -> int:
+    store.initialize()
+
+    def output(runs: tuple[DailyRun, ...], changes: tuple[tuple[str, str, str], ...]) -> bool:
+        rendered = render_daily_digest(runs, changes)
+        if rendered is None:
+            return False
+        _write(rendered)
+        return True
+
+    store.consume_digest(output)
+    return 0
+
+
+def main(argv: Sequence[str] | None = None) -> int:  # noqa: C901, PLR0911
     """Run the command-line application."""
     arguments = parser().parse_args(argv)
     if arguments.command is None:
         return 0
     if not arguments.store.exists():
+        if arguments.command == "digest":
+            return 0
         if arguments.command == "list":
             _write("No proposals.")
             return 0
@@ -143,10 +162,14 @@ def main(argv: Sequence[str] | None = None) -> int:  # noqa: PLR0911
             return _reject(store, arguments.proposal_id, arguments.reason)
         if arguments.command == "defer":
             return _defer(store, arguments.proposal_id, arguments.until)
+        if arguments.command == "digest":
+            return _digest(store)
         return _show(store, arguments.proposal_id)
-    except (sqlite3.DatabaseError, ValueError):
+    except (sqlite3.DatabaseError, RuntimeError, ValueError):
         action = (
-            "read proposal store" if arguments.command in {"list", "show"} else "update proposal"
+            "read proposal store"
+            if arguments.command in {"list", "show", "digest"}
+            else "update proposal"
         )
         _write(f"Cannot {action}: invalid or unsupported data.", error=True)
         return 1
