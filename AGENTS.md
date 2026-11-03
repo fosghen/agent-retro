@@ -41,7 +41,7 @@ concurrency or transaction boundaries, privacy/security/authentication/
 authorization, destructive or external side effects, or when concrete
 correctness uncertainty remains after self-review. Declare the trigger in the PR.
 
-Never commit directly to `main`. Each logical commit may contain at most 100
+Never commit directly to `main`. Each logical commit may contain at most 50
 changed lines, each PR at most 250 changed lines and 5 commits, and binary changes
 are forbidden. Never split coherent code solely to approach a line limit, and
 never bypass configured hooks with `--no-verify`.

@@ -10,7 +10,7 @@ import shutil
 import subprocess  # nosec B404
 import sys
 
-MAX_COMMIT_LINES = 100
+MAX_COMMIT_LINES = 50
 MAX_PR_LINES = 250
 MAX_COMMITS = 5
 GENERATED_EXCLUSIONS = frozenset({"uv.lock"})
@@ -46,16 +46,15 @@ def check(branch: str, commits: dict[str, str]) -> None:
     if len(commits) > MAX_COMMITS:
         message = f"PR has {len(commits)} commits; maximum is {MAX_COMMITS}"
         raise ChangeLimitError(message)
-    total_lines = 0
-    for commit, numstat in commits.items():
-        lines = count_lines(numstat)
-        total_lines += lines
-        if lines > MAX_COMMIT_LINES:
-            message = f"commit {commit} has {lines} changed lines; maximum is {MAX_COMMIT_LINES}"
-            raise ChangeLimitError(message)
+    line_counts = {commit: count_lines(numstat) for commit, numstat in commits.items()}
+    total_lines = sum(line_counts.values())
     if total_lines > MAX_PR_LINES:
         message = f"PR has {total_lines} changed lines; maximum is {MAX_PR_LINES}"
         raise ChangeLimitError(message)
+    for commit, lines in line_counts.items():
+        if lines > MAX_COMMIT_LINES:
+            message = f"commit {commit} has {lines} changed lines; maximum is {MAX_COMMIT_LINES}"
+            raise ChangeLimitError(message)
 
 
 def git(*args: str) -> str:
