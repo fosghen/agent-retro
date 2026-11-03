@@ -1,0 +1,38 @@
+import subprocess
+import unittest
+from unittest.mock import call, patch
+
+from scripts.run_quality_gate import commands, main
+
+
+class QualityGateTests(unittest.TestCase):
+    def test_commands_are_complete_and_deterministic(self) -> None:
+        result = commands("/bin/uv")
+        self.assertEqual(len(result), 6)
+        self.assertEqual(result[0][-2:], ("python", "scripts/check_agent_config.py"))
+        self.assertEqual(result[1][-1], "pytest")
+        self.assertEqual(result[2][-3:], ("mypy", "--strict", "src/agent_retro"))
+        self.assertEqual(result[-1][-2:], ("agent-retro", "--help"))
+        self.assertTrue(all("--frozen" in item and "--no-sync" in item for item in result))
+
+    def test_stops_at_first_failure(self) -> None:
+        with (
+            patch("scripts.run_quality_gate.shutil.which", return_value="/bin/uv"),
+            patch("scripts.run_quality_gate.subprocess.run") as run,
+        ):
+            run.side_effect = (
+                subprocess.CompletedProcess([], 0),
+                subprocess.CompletedProcess([], 9),
+            )
+
+            self.assertEqual(main(), 9)
+            self.assertEqual(run.call_count, 2)
+            expected = commands("/bin/uv")
+            self.assertEqual(
+                run.call_args_list,
+                [call(expected[0], check=False), call(expected[1], check=False)],
+            )
+
+    def test_missing_uv_is_bounded(self) -> None:
+        with patch("scripts.run_quality_gate.shutil.which", return_value=None):
+            self.assertEqual(main(), 127)
