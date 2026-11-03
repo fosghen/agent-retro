@@ -253,6 +253,25 @@ class ProposalStore:
         event_id = int(event_rows[-1][0]) if event_rows else int(event_cursor)
         return run_id, event_id, tuple(runs), changes
 
+    def consume_digest(
+        self,
+        consumer: Callable[[tuple[DailyRun, ...], tuple[tuple[str, str, str], ...]], bool],
+    ) -> bool:
+        """Serialize digest output and advance cursors only after consumer success."""
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            self._check_version(connection)
+            run_id, event_id, runs, changes = self._digest_snapshot(connection)
+            emitted = consumer(runs, changes)
+            if not isinstance(emitted, bool):
+                raise TypeError("digest consumer must return a boolean")  # noqa: EM101, TRY003
+            if emitted:
+                connection.execute(
+                    "UPDATE digest_cursor SET run_id = ?, event_id = ? WHERE singleton = 1",
+                    (run_id, event_id),
+                )
+        return emitted
+
     def save(self, proposal: Proposal, event: StatusEvent) -> None:
         """Atomically store one proposal revision and its append-only event."""
         if event.fingerprint != proposal.fingerprint or event.current != proposal.status:
