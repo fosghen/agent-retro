@@ -44,6 +44,12 @@ def parser() -> argparse.ArgumentParser:
     approve_parser = commands.add_parser("approve", help="approve the current proposal revision")
     approve_parser.add_argument("proposal_id")
     approve_parser.add_argument("--revision", type=int, required=True)
+    reject_parser = commands.add_parser("reject", help="reject a proposal")
+    reject_parser.add_argument("proposal_id")
+    reject_parser.add_argument("--reason", required=True)
+    defer_parser = commands.add_parser("defer", help="defer a proposal")
+    defer_parser.add_argument("proposal_id")
+    defer_parser.add_argument("--until", required=True)
     return result
 
 
@@ -103,6 +109,18 @@ def _approve(store: ProposalStore, proposal_id: str, revision: int) -> int:
     return 0
 
 
+def _reject(store: ProposalStore, proposal_id: str, reason: str) -> int:
+    store.reject(proposal_id, reason, datetime.now(UTC).isoformat())
+    _write(f"Rejected: {proposal_id}")
+    return 0
+
+
+def _defer(store: ProposalStore, proposal_id: str, until_date: str) -> int:
+    store.defer(proposal_id, until_date, datetime.now(UTC).isoformat())
+    _write(f"Deferred until {until_date}: {proposal_id}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:  # noqa: PLR0911
     """Run the command-line application."""
     arguments = parser().parse_args(argv)
@@ -121,7 +139,14 @@ def main(argv: Sequence[str] | None = None) -> int:  # noqa: PLR0911
             return _list(store, arguments.status)
         if arguments.command == "approve":
             return _approve(store, arguments.proposal_id, arguments.revision)
+        if arguments.command == "reject":
+            return _reject(store, arguments.proposal_id, arguments.reason)
+        if arguments.command == "defer":
+            return _defer(store, arguments.proposal_id, arguments.until)
         return _show(store, arguments.proposal_id)
     except (sqlite3.DatabaseError, ValueError):
-        _write("Cannot read proposal store: invalid or unsupported data.", error=True)
+        action = (
+            "read proposal store" if arguments.command in {"list", "show"} else "update proposal"
+        )
+        _write(f"Cannot {action}: invalid or unsupported data.", error=True)
         return 1

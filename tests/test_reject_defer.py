@@ -32,3 +32,24 @@ class RejectDeferTests(unittest.TestCase):
                 connection.execute("SELECT count(*) FROM decisions").fetchone()[0],
                 connection.execute("SELECT count(*) FROM events").fetchone()[0],
             )
+
+    def test_rejection_suppresses_duplicates_and_new_evidence_reopens(self) -> None:
+        rejected = self.store.reject(self.proposal.fingerprint, "Not actionable", "rejected-at")
+        self.assertEqual(rejected.status, ProposalStatus.REJECTED)
+        with self.assertRaises(SchemaError):
+            self.store.reject(self.proposal.fingerprint, "Again", "again-at")
+        self.assertEqual(self.store.aggregate_observation(observation("source-b")), rejected)
+        self.assertEqual(self.counts(), (1, 1))
+
+        reopened = self.store.aggregate_observation(observation("source-c"), occurred_at="new-at")
+        self.assertEqual(reopened.status, ProposalStatus.NEW)
+        with sqlite3.connect(self.path) as connection:
+            decision = connection.execute(
+                "SELECT decision, revision, occurred_at, reason, until_date FROM decisions"
+            ).fetchone()
+            event_times = connection.execute(
+                "SELECT occurred_at FROM events ORDER BY id"
+            ).fetchall()
+        self.assertEqual(decision, ("rejected", 1, "rejected-at", "Not actionable", None))
+        self.assertEqual(event_times, [("rejected-at",), ("new-at",)])
+        self.assertEqual(self.counts(), (1, 2))
