@@ -237,3 +237,34 @@ def proposal_from_mapping(value: object) -> Proposal:
         ),
     )
     return Proposal(version, _text(root.get("fingerprint"), "fingerprint"), status, revision)
+
+
+def analyzer_candidate_from_mapping(value: object) -> AnalyzerCandidate:
+    """Validate untrusted structured analyzer output before persistence."""
+    root = _mapping(value, "candidate")
+    version = _integer(root.get("schema_version"), "schema_version")
+    if version != SCHEMA_VERSION:
+        raise SchemaError(f"unsupported schema version: {version}")  # noqa: EM102, TRY003
+    evidence = _mapping(root.get("evidence"), "evidence")
+    observation = ProposalObservation(
+        _bounded_text(root.get("intent"), "intent"),
+        _bounded_text(root.get("target"), "target"),
+        _bounded_text(root.get("scope"), "scope"),
+        EvidenceReference(
+            _text(evidence.get("source_hash"), "source_hash"),
+            _text(evidence.get("excerpt"), "excerpt"),
+        ),
+    )
+    fields = (
+        "title",
+        "rationale",
+        "problem",
+        "affected_workflow",
+        "proposed_artifact",
+        "expected_benefit",
+        "risks",
+        "validation",
+    )
+    return AnalyzerCandidate(
+        version, observation, *(_bounded_text(root.get(name), name) for name in fields)
+    )
