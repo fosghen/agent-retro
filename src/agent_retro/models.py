@@ -11,6 +11,7 @@ SCHEMA_VERSION = 1
 MAX_EXCERPT_CHARS = 500
 MAX_PROPOSAL_EVIDENCE = 5
 MAX_SOURCE_HASH_CHARS = 128
+MAX_STRUCTURED_TEXT_CHARS = 1000
 
 
 class SchemaError(ValueError):
@@ -71,6 +72,39 @@ class ProposalObservation:
         )
         digest = hashlib.sha256(identity.encode(), usedforsecurity=False).hexdigest()
         return f"sha256:{digest}"
+
+
+@dataclass(frozen=True)
+class AnalyzerCandidate:
+    """Validated structured analyzer output awaiting durable ingestion."""
+
+    schema_version: int
+    observation: ProposalObservation
+    title: str
+    rationale: str
+    problem: str
+    affected_workflow: str
+    proposed_artifact: str
+    expected_benefit: str
+    risks: str
+    validation: str
+
+    def revision(self) -> ProposalRevision:
+        """Build the initial reviewable revision without occurrence evidence."""
+        return ProposalRevision(
+            1,
+            self.title,
+            self.rationale,
+            self.observation.target,
+            (),
+            self.problem,
+            self.affected_workflow,
+            self.proposed_artifact,
+            self.expected_benefit,
+            self.risks,
+            self.observation.scope,
+            self.validation,
+        )
 
 
 @dataclass(frozen=True)
@@ -147,6 +181,13 @@ def _text(value: object, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise SchemaError(f"{field} must be a non-empty string")  # noqa: EM102, TRY003
     return value
+
+
+def _bounded_text(value: object, field: str) -> str:
+    text = _text(value, field)
+    if len(text) > MAX_STRUCTURED_TEXT_CHARS:
+        raise SchemaError(f"{field} exceeds {MAX_STRUCTURED_TEXT_CHARS} characters")  # noqa: EM102, TRY003
+    return text
 
 
 def _integer(value: object, field: str) -> int:
