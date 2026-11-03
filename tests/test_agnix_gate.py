@@ -5,10 +5,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts import check_agent_config
-
+from scripts.run_quality_gate import commands
 
 ROOT = Path(__file__).resolve().parents[1]
-GATE_COMMAND = "python scripts/check_agent_config.py"
+QUALITY_GATE = "python scripts/run_quality_gate.py"
 
 
 def test_gate_runs_strict_codex_validation() -> None:
@@ -31,6 +31,7 @@ def test_agnix_is_exactly_pinned() -> None:
 
 
 def test_precommit_and_ci_use_the_local_gate() -> None:
-    """Pre-commit and CI must call the same offline wrapper."""
-    assert GATE_COMMAND in (ROOT / ".pre-commit-config.yaml").read_text()
-    assert GATE_COMMAND in (ROOT / ".github/workflows/ci.yml").read_text()
+    """Pre-push and CI must call one wrapper containing the agnix gate."""
+    assert QUALITY_GATE in (ROOT / ".pre-commit-config.yaml").read_text()
+    assert QUALITY_GATE in (ROOT / ".github/workflows/ci.yml").read_text()
+    assert commands("uv")[0][-2:] == ("python", "scripts/check_agent_config.py")
