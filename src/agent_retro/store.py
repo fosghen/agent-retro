@@ -205,7 +205,9 @@ class ProposalStore:
             ).fetchone()
         return int(row[0])
 
-    def aggregate_observation(self, observation: ProposalObservation) -> Proposal | None:
+    def aggregate_observation(
+        self, observation: ProposalObservation, *, occurred_at: str | None = None
+    ) -> Proposal | None:
         """Record evidence and promote recurring observations atomically."""
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -225,7 +227,12 @@ class ProposalStore:
                 (observation.fingerprint,),
             ).fetchone()
             current = None if current_row is None else self._proposal(current_row)
-            if current is not None and (not inserted or current.status is not ProposalStatus.NEW):
+            if current is not None and not inserted:
+                return current
+            if current is not None and current.status not in {
+                ProposalStatus.NEW,
+                ProposalStatus.REJECTED,
+            }:
                 return current
             evidence = tuple(
                 EvidenceReference(source_hash, excerpt)
@@ -258,10 +265,18 @@ class ProposalStore:
                     rationale=f"Observed in {len(rows)} distinct sources.",
                     evidence=evidence,
                 )
-                proposal = replace(current, revision=revision)
+                reopened = current.status is ProposalStatus.REJECTED
+                if reopened and not occurred_at:
+                    message = "occurred_at is required to reopen rejected evidence"
+                    raise ValueError(message)
+                proposal = replace(
+                    current,
+                    status=ProposalStatus.NEW if reopened else current.status,
+                    revision=revision,
+                )
                 connection.execute(
-                    "UPDATE proposals SET current_revision = ? WHERE fingerprint = ?",
-                    (revision.number, proposal.fingerprint),
+                    "UPDATE proposals SET status = ?, current_revision = ? WHERE fingerprint = ?",
+                    (proposal.status.value, revision.number, proposal.fingerprint),
                 )
             connection.execute(
                 "INSERT INTO revisions VALUES (?, ?, ?)",
@@ -271,4 +286,15 @@ class ProposalStore:
                     json.dumps(asdict(revision), sort_keys=True),
                 ),
             )
+            if current is not None and current.status is ProposalStatus.REJECTED:
+                connection.execute(
+                    "INSERT INTO events (fingerprint, previous, current, occurred_at) "
+                    "VALUES (?, ?, ?, ?)",
+                    (
+                        proposal.fingerprint,
+                        ProposalStatus.REJECTED.value,
+                        ProposalStatus.NEW.value,
+                        occurred_at,
+                    ),
+                )
         return proposal
