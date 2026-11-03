@@ -181,6 +181,18 @@ class ProposalStore:
                 result.append((int(run_id), DailyRun(str(run_date), str(completed_at), outcomes)))
         return result
 
+    def retryable_failures(self) -> list[DailySessionOutcome]:
+        """Return failed sessions with local logs for a later retry."""
+        with self._connect() as connection:
+            self._check_version(connection)
+            rows = connection.execute(
+                "SELECT o.session_hash, o.status, o.detail, o.retryable, o.log_ref "
+                "FROM daily_outcomes o WHERE o.status = 'failed' AND o.retryable = 1 "
+                "AND o.run_id = (SELECT max(n.run_id) FROM daily_outcomes n "
+                "WHERE n.session_hash = o.session_hash) ORDER BY o.run_id, o.rowid"
+            ).fetchall()
+        return [self._daily_outcome(row) for row in rows]
+
     def save(self, proposal: Proposal, event: StatusEvent) -> None:
         """Atomically store one proposal revision and its append-only event."""
         if event.fingerprint != proposal.fingerprint or event.current != proposal.status:
