@@ -8,10 +8,11 @@ from scripts.run_quality_gate import commands, main
 class QualityGateTests(unittest.TestCase):
     def test_commands_are_complete_and_deterministic(self) -> None:
         result = commands("/bin/uv")
-        self.assertEqual(len(result), 6)
+        self.assertEqual(len(result), 7)
         self.assertEqual(result[0][-2:], ("python", "scripts/check_agent_config.py"))
-        self.assertEqual(result[1][-1], "pytest")
-        self.assertEqual(result[2][-3:], ("mypy", "--strict", "src/agent_retro"))
+        self.assertEqual(result[1][-2:], ("python", "scripts/check_ruff.py"))
+        self.assertEqual(result[2][-1], "pytest")
+        self.assertEqual(result[3][-3:], ("mypy", "--strict", "src/agent_retro"))
         self.assertEqual(result[-1][-2:], ("agent-retro", "--help"))
         self.assertTrue(all("--frozen" in item and "--no-sync" in item for item in result))
 

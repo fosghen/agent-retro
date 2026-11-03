@@ -16,6 +16,12 @@ repos:
         language: system
         always_run: true
         pass_filenames: false
+      - id: scoped-ruff
+        name: maintained-scope Ruff format and lint
+        entry: uv run --frozen --no-sync python scripts/check_ruff.py
+        language: system
+        always_run: true
+        pass_filenames: false
       - id: full-quality-gate
         name: single full publication gate
         entry: uv run --frozen --no-sync python scripts/run_quality_gate.py
