@@ -24,6 +24,10 @@ from agent_retro.transcript_io import (
     read_head_tail,
     stream_raw_jsonl,
 )
+from agent_retro.transcript_normalize import (
+    normalize_codex_content as _normalize_codex_content,
+    normalize_codex_tool as _codex_tool_use,
+)
 
 # Approximate pricing per million tokens (Claude Opus 4.6)
 # Update these when Anthropic changes pricing and bump PRICING_LAST_VERIFIED.
@@ -36,18 +40,6 @@ PRICE_PER_M = {
 }
 
 SCHEMA_VERSION = "0.1.0"
-
-def _normalize_codex_content(content):
-    """Convert Codex text blocks to the shared text-block shape."""
-    if not isinstance(content, list):
-        return content
-    normalized = []
-    for block in content:
-        if not isinstance(block, dict):
-            continue
-        if block.get("type") in ("input_text", "output_text", "text"):
-            normalized.append({"type": "text", "text": block.get("text", "")})
-    return normalized
 
 
 def _json_object(value):
@@ -69,29 +61,6 @@ def _is_injected_user_text(text):
         "<environment_context>",
         "# AGENTS.md instructions for ",
     ))
-
-
-def _codex_tool_use(payload):
-    """Normalize Codex custom and function tool calls."""
-    name = payload.get("name", "unknown")
-    if payload.get("type") == "custom_tool_call":
-        tool_input = {"command": payload.get("input", "")}
-    else:
-        tool_input = _json_object(payload.get("arguments"))
-    if name.endswith("spawn_agent"):
-        name = "Agent"
-        tool_input = {
-            "description": tool_input.get("task_name", ""),
-            "subagent_type": tool_input.get("task_name", ""),
-            "model": tool_input.get("model", ""),
-            "prompt": tool_input.get("message", ""),
-        }
-    return {
-        "type": "tool_use",
-        "id": payload.get("call_id", ""),
-        "name": name,
-        "input": tool_input,
-    }
 
 
 def _normalize_codex_record(record):
