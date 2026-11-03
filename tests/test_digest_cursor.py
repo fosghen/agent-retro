@@ -95,3 +95,52 @@ class DigestCursorTests(unittest.TestCase):
         def invalid_result(_runs: object, _changes: object) -> bool:
             nonlocal called
             called = True
+            return 1  # type: ignore[return-value]
+
+        for value in (999, -1, "bad"):
+            with sqlite3.connect(self.path) as connection:
+                connection.execute("UPDATE digest_cursor SET run_id = ?", (value,))
+            with self.assertRaisesRegex(ValueError, "invalid stored digest cursor"):
+                self.store.consume_digest(invalid_result)
+        self.assertFalse(called)
+
+        with sqlite3.connect(self.path) as connection:
+            connection.execute("UPDATE digest_cursor SET run_id = 0")
+        with self.assertRaisesRegex(TypeError, "must return a boolean"):
+            self.store.consume_digest(invalid_result)
+        self.assertEqual(self.cursor(), (0, 0))
+
+        called = False
+        with sqlite3.connect(self.path) as connection:
+            connection.execute("PRAGMA user_version = 6")
+        with self.assertRaisesRegex(ValueError, "unsupported store version"):
+            self.store.consume_digest(invalid_result)
+        self.assertFalse(called)
+
+        with sqlite3.connect(self.path) as connection:
+            connection.execute("PRAGMA user_version = 5")
+            connection.execute("DELETE FROM digest_cursor")
+        with self.assertRaisesRegex(ValueError, "invalid stored digest cursor"):
+            self.store.consume_digest(invalid_result)
+
+    def test_v4_migration_failure_preserves_state_and_retries(self) -> None:
+        self.store.record_daily_run(analyzed_run())
+        with sqlite3.connect(self.path) as connection:
+            connection.execute("DROP TABLE digest_cursor")
+            connection.execute("PRAGMA user_version = 4")
+
+        class BrokenStore(ProposalStore):
+            def _migrate_v5(self, connection: sqlite3.Connection) -> None:
+                super()._migrate_v5(connection)
+                raise RuntimeError
+
+        with self.assertRaises(RuntimeError):
+            BrokenStore(self.path).initialize()
+        with sqlite3.connect(self.path) as connection:
+            version = connection.execute("PRAGMA user_version").fetchone()[0]
+            cursor_table = connection.execute("PRAGMA table_info(digest_cursor)").fetchall()
+            run_count = connection.execute("SELECT count(*) FROM daily_runs").fetchone()[0]
+        self.assertEqual((version, cursor_table, run_count), (4, [], 1))
+
+        self.store.initialize()
+        self.assertEqual(self.cursor(), (0, 0))
