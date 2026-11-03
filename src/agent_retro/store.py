@@ -7,6 +7,7 @@ import sqlite3
 from dataclasses import asdict, replace
 from datetime import UTC, date, datetime
 from pathlib import Path  # noqa: TC003 -- public constructor accepts Path.
+from typing import TYPE_CHECKING
 
 from agent_retro.models import (
     MAX_PROPOSAL_EVIDENCE,
@@ -26,7 +27,10 @@ from agent_retro.models import (
     proposal_from_mapping,
 )
 
-STORE_VERSION = 4
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+STORE_VERSION = 5
 PROMOTION_OCCURRENCES = 2
 MAX_DECISION_REASON_CHARS = 1000
 
@@ -59,11 +63,14 @@ class ProposalStore:
             if version == 1:
                 self._migrate_v2(connection)
                 version = 2
-            if version == STORE_VERSION - 2:
+            if version == STORE_VERSION - 3:
                 self._migrate_v3(connection)
                 version = 3
-            if version == STORE_VERSION - 1:
+            if version == STORE_VERSION - 2:
                 self._migrate_v4(connection)
+                version = 4
+            if version == STORE_VERSION - 1:
+                self._migrate_v5(connection)
 
     def _migrate_v1(self, connection: sqlite3.Connection) -> None:
         connection.execute(
@@ -110,6 +117,14 @@ class ProposalStore:
             "FOREIGN KEY(run_id) REFERENCES daily_runs(id))"
         )
         connection.execute("PRAGMA user_version = 4")
+
+    def _migrate_v5(self, connection: sqlite3.Connection) -> None:
+        connection.execute(
+            "CREATE TABLE digest_cursor (singleton INTEGER PRIMARY KEY CHECK(singleton = 1), "
+            "run_id INTEGER NOT NULL, event_id INTEGER NOT NULL)"
+        )
+        connection.execute("INSERT INTO digest_cursor VALUES (1, 0, 0)")
+        connection.execute("PRAGMA user_version = 5")
 
     def record_daily_run(self, run: DailyRun) -> int:
         """Atomically persist one privacy-safe daily run summary."""
@@ -192,6 +207,70 @@ class ProposalStore:
                 "WHERE n.session_hash = o.session_hash) ORDER BY o.run_id, o.rowid"
             ).fetchall()
         return [self._daily_outcome(row) for row in rows]
+
+    def _digest_snapshot(
+        self, connection: sqlite3.Connection
+    ) -> tuple[int, int, tuple[DailyRun, ...], tuple[tuple[str, str, str], ...]]:
+        cursor_row = connection.execute(
+            "SELECT run_id, event_id FROM digest_cursor WHERE singleton = 1"
+        ).fetchone()
+        maxima = connection.execute(
+            "SELECT coalesce((SELECT max(id) FROM daily_runs), 0), "
+            "coalesce((SELECT max(id) FROM events), 0)"
+        ).fetchone()
+        if cursor_row is None or any(
+            not isinstance(value, int) or isinstance(value, bool) or not 0 <= value <= maximum
+            for value, maximum in zip(cursor_row, maxima, strict=True)
+        ):
+            raise SchemaError("invalid stored digest cursor")  # noqa: EM101, TRY003
+        run_cursor, event_cursor = cursor_row
+        run_rows = connection.execute(
+            "SELECT id, run_date, completed_at FROM daily_runs WHERE id > ? ORDER BY id",
+            (run_cursor,),
+        ).fetchall()
+        runs = []
+        for run_id, run_date, completed_at in run_rows:
+            rows = connection.execute(
+                "SELECT session_hash, status, detail, retryable, log_ref "
+                "FROM daily_outcomes WHERE run_id = ? ORDER BY rowid",
+                (run_id,),
+            ).fetchall()
+            outcomes = tuple(self._daily_outcome(row) for row in rows)
+            runs.append(DailyRun(str(run_date), str(completed_at), outcomes))
+        event_rows = connection.execute(
+            "SELECT id, fingerprint, previous, current FROM events WHERE id > ? ORDER BY id",
+            (event_cursor,),
+        ).fetchall()
+        changes = tuple(
+            (
+                str(fingerprint),
+                ProposalStatus(str(previous)).value,
+                ProposalStatus(str(current)).value,
+            )
+            for _, fingerprint, previous, current in event_rows
+        )
+        run_id = int(run_rows[-1][0]) if run_rows else int(run_cursor)
+        event_id = int(event_rows[-1][0]) if event_rows else int(event_cursor)
+        return run_id, event_id, tuple(runs), changes
+
+    def consume_digest(
+        self,
+        consumer: Callable[[tuple[DailyRun, ...], tuple[tuple[str, str, str], ...]], bool],
+    ) -> bool:
+        """Serialize digest output and advance cursors only after consumer success."""
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            self._check_version(connection)
+            run_id, event_id, runs, changes = self._digest_snapshot(connection)
+            emitted = consumer(runs, changes)
+            if not isinstance(emitted, bool):
+                raise TypeError("digest consumer must return a boolean")  # noqa: EM101, TRY003
+            if emitted:
+                connection.execute(
+                    "UPDATE digest_cursor SET run_id = ?, event_id = ? WHERE singleton = 1",
+                    (run_id, event_id),
+                )
+        return emitted
 
     def save(self, proposal: Proposal, event: StatusEvent) -> None:
         """Atomically store one proposal revision and its append-only event."""

@@ -67,6 +67,7 @@ class DailyRunSchemaTests(unittest.TestCase):
             )
             connection.execute("DROP TABLE daily_outcomes")
             connection.execute("DROP TABLE daily_runs")
+            connection.execute("DROP TABLE digest_cursor")
             connection.execute("PRAGMA user_version = 3")
 
         class BrokenStore(ProposalStore):

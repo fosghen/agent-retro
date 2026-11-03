@@ -44,7 +44,7 @@ class ProposalStoreInitializationTests(unittest.TestCase):
         store.initialize()
 
         with sqlite3.connect(self.path) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 4)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 5)
             tables = connection.execute(
                 "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name"
             ).fetchall()
@@ -54,6 +54,7 @@ class ProposalStoreInitializationTests(unittest.TestCase):
                 ("daily_outcomes",),
                 ("daily_runs",),
                 ("decisions",),
+                ("digest_cursor",),
                 ("events",),
                 ("occurrences",),
                 ("proposals",),
@@ -150,7 +151,7 @@ class ProposalStoreInitializationTests(unittest.TestCase):
             store.list_proposals()
 
         with sqlite3.connect(self.path) as connection:
-            connection.execute("PRAGMA user_version = 5")
+            connection.execute("PRAGMA user_version = 6")
         with self.assertRaisesRegex(ValueError, "unsupported store version"):
             store.get("fingerprint")
 
@@ -205,7 +206,7 @@ class ProposalStoreInitializationTests(unittest.TestCase):
         store = ProposalStore(self.path)
         store.initialize()
         with sqlite3.connect(self.path) as connection:
-            connection.execute("PRAGMA user_version = 5")
+            connection.execute("PRAGMA user_version = 6")
         with self.assertRaisesRegex(ValueError, "unsupported store version"):
             store.record_observation(observation("source-a"))
         with sqlite3.connect(self.path) as connection:

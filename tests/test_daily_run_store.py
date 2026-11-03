@@ -78,7 +78,7 @@ class DailyRunStoreTests(unittest.TestCase):
 
         with sqlite3.connect(self.path) as connection:
             connection.execute("DROP TRIGGER fail_outcome")
-            connection.execute("PRAGMA user_version = 5")
+            connection.execute("PRAGMA user_version = 6")
         with self.assertRaisesRegex(ValueError, "unsupported store version"):
             self.store.record_daily_run(run(3, outcome("session-a")))
         self.assertEqual(self.counts(), (0, 0))
