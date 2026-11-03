@@ -3,7 +3,14 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from agent_retro.models import Proposal, ProposalRevision, ProposalStatus, StatusEvent
+from agent_retro.models import (
+    EvidenceReference,
+    Proposal,
+    ProposalObservation,
+    ProposalRevision,
+    ProposalStatus,
+    StatusEvent,
+)
 from agent_retro.store import ProposalStore
 
 
@@ -14,6 +21,12 @@ def proposal() -> Proposal:
 
 def event() -> StatusEvent:
     return StatusEvent(1, "fingerprint", ProposalStatus.NEW, ProposalStatus.APPROVED, "now")
+
+
+def observation(source_hash: str, *, scope: str = "one file") -> ProposalObservation:
+    return ProposalObservation(
+        "Improve review", "agent-retro", scope, EvidenceReference(source_hash, "bounded")
+    )
 
 
 class ProposalStoreInitializationTests(unittest.TestCase):
@@ -29,11 +42,11 @@ class ProposalStoreInitializationTests(unittest.TestCase):
         store.initialize()
 
         with sqlite3.connect(self.path) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 1)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 2)
             tables = connection.execute(
                 "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name"
             ).fetchall()
-        self.assertEqual(tables, [("events",), ("proposals",), ("revisions",)])
+        self.assertEqual(tables, [("events",), ("occurrences",), ("proposals",), ("revisions",)])
 
     def test_corrupt_database_is_not_replaced(self) -> None:
         self.path.parent.mkdir()
@@ -124,7 +137,7 @@ class ProposalStoreInitializationTests(unittest.TestCase):
             store.list_proposals()
 
         with sqlite3.connect(self.path) as connection:
-            connection.execute("PRAGMA user_version = 2")
+            connection.execute("PRAGMA user_version = 3")
         with self.assertRaisesRegex(ValueError, "unsupported store version"):
             store.get("fingerprint")
 

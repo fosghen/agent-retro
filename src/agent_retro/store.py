@@ -7,9 +7,16 @@ import sqlite3
 from dataclasses import asdict
 from pathlib import Path  # noqa: TC003 -- public constructor accepts Path.
 
-from agent_retro.models import Proposal, ProposalStatus, StatusEvent, proposal_from_mapping
+from agent_retro.models import (
+    EvidenceReference,
+    Proposal,
+    ProposalObservation,
+    ProposalStatus,
+    StatusEvent,
+    proposal_from_mapping,
+)
 
-STORE_VERSION = 1
+STORE_VERSION = 2
 
 
 class ProposalStore:
@@ -36,6 +43,9 @@ class ProposalStore:
                 raise RuntimeError(message)
             if version == 0:
                 self._migrate_v1(connection)
+                version = 1
+            if version == 1:
+                self._migrate_v2(connection)
 
     def _migrate_v1(self, connection: sqlite3.Connection) -> None:
         connection.execute(
@@ -51,7 +61,16 @@ class ProposalStore:
             "CREATE TABLE events (id INTEGER PRIMARY KEY, fingerprint TEXT NOT NULL, "
             "previous TEXT NOT NULL, current TEXT NOT NULL, occurred_at TEXT NOT NULL)"
         )
-        connection.execute(f"PRAGMA user_version = {STORE_VERSION}")
+        connection.execute("PRAGMA user_version = 1")
+
+    def _migrate_v2(self, connection: sqlite3.Connection) -> None:
+        connection.execute(
+            "CREATE TABLE occurrences (id INTEGER PRIMARY KEY, fingerprint TEXT NOT NULL, "
+            "intent TEXT NOT NULL, target TEXT NOT NULL, scope TEXT NOT NULL, "
+            "source_hash TEXT NOT NULL, excerpt TEXT NOT NULL, "
+            "UNIQUE(fingerprint, source_hash))"
+        )
+        connection.execute("PRAGMA user_version = 2")
 
     def save(self, proposal: Proposal, event: StatusEvent) -> None:
         """Atomically store one proposal revision and its append-only event."""
