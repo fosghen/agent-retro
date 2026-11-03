@@ -16,6 +16,7 @@ from agent_retro.models import (
     ProposalObservation,
     ProposalRevision,
     ProposalStatus,
+    SchemaError,
     StatusEvent,
     analyzer_candidate_from_mapping,
     proposal_from_mapping,
@@ -172,6 +173,54 @@ class ProposalStore:
         return None if row is None else self._proposal(row)
 
     def record_observation(self, observation: ProposalObservation) -> bool:
+    def approved_revision(self, fingerprint: str) -> ProposalRevision | None:
+        """Return the immutable revision frozen by approval."""
+        with self._connect() as connection:
+            self._check_version(connection)
+            row = connection.execute(
+                "SELECT p.schema_version, p.fingerprint, p.status, r.payload "
+                "FROM decisions d JOIN proposals p ON p.fingerprint = d.fingerprint "
+                "JOIN revisions r ON r.fingerprint = d.fingerprint AND r.revision = d.revision "
+                "WHERE d.fingerprint = ? AND d.decision = 'approved' ORDER BY d.id LIMIT 1",
+                (fingerprint,),
+            ).fetchone()
+        return None if row is None else self._proposal(row).revision
+
+    def approve(self, fingerprint: str, revision: int, occurred_at: str) -> Proposal:
+        """Atomically approve and freeze the current reviewed revision."""
+        if not isinstance(occurred_at, str) or not occurred_at.strip():
+            raise SchemaError("approval timestamp is required")  # noqa: EM101, TRY003
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            self._check_version(connection)
+            row = connection.execute(
+                "SELECT p.schema_version, p.fingerprint, p.status, r.payload "
+                "FROM proposals p JOIN revisions r ON r.fingerprint = p.fingerprint "
+                "AND r.revision = p.current_revision WHERE p.fingerprint = ?",
+                (fingerprint,),
+            ).fetchone()
+            if row is None:
+                raise SchemaError("proposal not found")  # noqa: EM101, TRY003
+            current = self._proposal(row)
+            if current.revision.number != revision:
+                raise SchemaError("reviewed revision is stale")  # noqa: EM101, TRY003
+            approved = current.transition(ProposalStatus.APPROVED)
+            connection.execute(
+                "INSERT INTO decisions (fingerprint, decision, revision, occurred_at) "
+                "VALUES (?, 'approved', ?, ?)",
+                (fingerprint, revision, occurred_at),
+            )
+            connection.execute(
+                "UPDATE proposals SET status = ? WHERE fingerprint = ?",
+                (approved.status.value, fingerprint),
+            )
+            connection.execute(
+                "INSERT INTO events (fingerprint, previous, current, occurred_at) "
+                "VALUES (?, ?, ?, ?)",
+                (fingerprint, current.status.value, approved.status.value, occurred_at),
+            )
+        return approved
+
         """Persist one distinct source observation and report whether it was new."""
         with self._connect() as connection:
             self._check_version(connection)
