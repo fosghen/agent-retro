@@ -42,3 +42,47 @@ class DailyDigestTests(unittest.TestCase):
         write.assert_called_once_with(
             "Cannot read proposal store: invalid or unsupported data.", error=True
         )
+
+    def seed_changes(self) -> str:
+        def observation(source: str) -> ProposalObservation:
+            return ProposalObservation(
+                "Improve review",
+                "agent-retro",
+                "one skill",
+                EvidenceReference(source, "private evidence"),
+            )
+
+        self.store.aggregate_observation(observation("source-a"))
+        proposal = self.store.aggregate_observation(
+            observation("source-b"), occurred_at="created-at"
+        )
+        if proposal is None:
+            self.fail("proposal was not promoted")
+        self.store.approve(proposal.fingerprint, 1, "approved-at")
+        first = DailyRun(
+            "2026-11-02",
+            "first",
+            (
+                outcome("private-a", SessionOutcomeStatus.FAILED, retryable=True, log="logs/a.log"),
+                outcome("private-b", SessionOutcomeStatus.FAILED, retryable=True, log="logs/b.log"),
+            ),
+        )
+        second = DailyRun(
+            "2026-11-03",
+            "second",
+            (
+                outcome("private-a", SessionOutcomeStatus.ANALYZED),
+                outcome("private-b", SessionOutcomeStatus.FAILED, log="logs/b-final.log"),
+                outcome("private-c", SessionOutcomeStatus.FAILED, retryable=True, log="logs/c.log"),
+                outcome("private-d", SessionOutcomeStatus.SKIPPED),
+            ),
+        )
+        self.store.record_daily_run(first)
+        self.store.record_daily_run(second)
+        return proposal.fingerprint
+
+    def run_digest(self) -> str:
+        output_stream = io.StringIO()
+        with redirect_stdout(output_stream):
+            self.assertEqual(main(["--store", str(self.path), "digest"]), 0)
+        return output_stream.getvalue()
