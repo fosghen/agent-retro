@@ -326,5 +326,46 @@ class ProposalStoreInitializationTests(unittest.TestCase):
             )
         self.assertEqual(counts, (2, 1, 1))
 
+    def test_new_evidence_reopens_rejected_proposal_once(self) -> None:
+        store = ProposalStore(self.path)
+        store.initialize()
+        store.aggregate_observation(observation("source-a"))
+        promoted = store.aggregate_observation(observation("source-b"))
+        rejected = promoted.transition(ProposalStatus.REJECTED)
+        store.save(
+            rejected,
+            StatusEvent(
+                1, rejected.fingerprint, ProposalStatus.NEW, ProposalStatus.REJECTED, "rejected"
+            ),
+        )
+
+        reopened = store.aggregate_observation(observation("source-c"), occurred_at="new-evidence")
+        self.assertEqual((reopened.status, reopened.revision.number), (ProposalStatus.NEW, 2))
+        self.assertEqual(
+            [item.source_hash for item in reopened.revision.evidence],
+            ["source-a", "source-b", "source-c"],
+        )
+        self.assertEqual(store.aggregate_observation(observation("source-c")), reopened)
+        with sqlite3.connect(self.path) as connection:
+            event = connection.execute(
+                "SELECT previous, current, occurred_at FROM events ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+            counts = tuple(
+                connection.execute(query).fetchone()[0]
+                for query in (
+                    "SELECT count(*) FROM occurrences",
+                    "SELECT count(*) FROM revisions",
+                    "SELECT count(*) FROM events",
+                )
+            )
+            payloads = connection.execute(
+                "SELECT payload FROM revisions ORDER BY revision"
+            ).fetchall()
+        self.assertEqual(event, ("rejected", "new", "new-evidence"))
+        self.assertEqual(counts, (3, 2, 2))
+        evidence = [
+            [item["source_hash"] for item in json.loads(row[0])["evidence"]] for row in payloads
+        ]
+        self.assertEqual(evidence, [["source-a", "source-b"], ["source-a", "source-b", "source-c"]])
 if __name__ == "__main__":
     unittest.main()
