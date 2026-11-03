@@ -25,6 +25,12 @@ jobs:
         with:
           version: "0.12.18"
           enable-cache: true
+      - name: Check pull request process declaration
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: python scripts/check_pr_process.py
       - name: Check pull request limits
         if: github.event_name == 'pull_request'
         env:
