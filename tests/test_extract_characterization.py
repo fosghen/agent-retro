@@ -2,6 +2,7 @@ import hashlib
 import json
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from scripts import extract
 
@@ -41,3 +42,28 @@ class ExtractorCharacterizationTests(unittest.TestCase):
         for workload, (fixture, expected) in WORKLOADS.items():
             with self.subTest(workload=workload):
                 self.assertEqual(canonical_digest(fixture), expected)
+
+    def test_malformed_jsonl_records_are_skipped(self) -> None:
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "malformed.jsonl"
+            path.write_text('{"id":1}\nnot-json\n{"id":2}\n')
+            records = list(extract.stream_raw_jsonl(path))
+        self.assertEqual(records, [{"id": 1}, {"id": 2}])
+
+    def test_head_tail_reads_remain_bounded(self) -> None:
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "large.jsonl"
+            size = 2 * extract.LITE_READ_BUF_SIZE + 17
+            path.write_bytes(b"x" * size)
+            head, tail, observed_size = extract.read_head_tail(path)
+        self.assertEqual(observed_size, size)
+        self.assertEqual(len(head), extract.LITE_READ_BUF_SIZE)
+        self.assertEqual(len(tail), extract.LITE_READ_BUF_SIZE)
+
+    def test_conversation_workloads_preserve_both_roles(self) -> None:
+        for workload in ("codex", "large", "tool-heavy", "compacted"):
+            fixture = WORKLOADS[workload][0]
+            result = extract.extract_all_streaming(str(FIXTURES / fixture))
+            roles = {item["role"] for item in result["conversation_arc"]}
+            with self.subTest(workload=workload):
+                self.assertTrue({"user", "assistant"}.issubset(roles))
