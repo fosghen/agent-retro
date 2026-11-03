@@ -12,6 +12,8 @@ from agent_retro.models import (
     MAX_PROPOSAL_EVIDENCE,
     SCHEMA_VERSION,
     AnalyzerCandidate,
+    DailyRun,
+    DailySessionOutcome,
     EvidenceReference,
     Proposal,
     ProposalObservation,
@@ -20,6 +22,7 @@ from agent_retro.models import (
     SchemaError,
     StatusEvent,
     analyzer_candidate_from_mapping,
+    SessionOutcomeStatus,
     proposal_from_mapping,
 )
 
@@ -107,6 +110,34 @@ class ProposalStore:
             "FOREIGN KEY(run_id) REFERENCES daily_runs(id))"
         )
         connection.execute("PRAGMA user_version = 4")
+
+    def record_daily_run(self, run: DailyRun) -> int:
+        """Atomically persist one privacy-safe daily run summary."""
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            self._check_version(connection)
+            cursor = connection.execute(
+                "INSERT INTO daily_runs (run_date, completed_at) VALUES (?, ?)",
+                (run.run_date, run.completed_at),
+            )
+            if cursor.lastrowid is None:
+                raise RuntimeError("daily run id was not generated")  # noqa: EM101, TRY003
+            run_id = cursor.lastrowid
+            connection.executemany(
+                "INSERT INTO daily_outcomes VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    (
+                        run_id,
+                        item.session_hash,
+                        item.status.value,
+                        item.detail,
+                        item.retryable,
+                        item.log_ref,
+                    )
+                    for item in run.outcomes
+                ),
+            )
+        return run_id
 
     def save(self, proposal: Proposal, event: StatusEvent) -> None:
         """Atomically store one proposal revision and its append-only event."""
