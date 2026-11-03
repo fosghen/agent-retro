@@ -86,3 +86,23 @@ class RejectDeferTests(unittest.TestCase):
             ).fetchone()
         self.assertEqual(row, ("deferred", "deferred-at", None, "2026-12-01"))
         self.assertEqual(self.counts(), (1, 1))
+
+    def test_cli_rejects_and_reports_invalid_deferral_without_traceback(self) -> None:
+        result = main(
+            ["--store", str(self.path), "reject", self.proposal.fingerprint, "--reason", "Noise"]
+        )
+        self.assertEqual(result, 0)
+        self.assertEqual(self.store.get(self.proposal.fingerprint).status, ProposalStatus.REJECTED)
+
+        error = io.StringIO()
+        with redirect_stderr(error):
+            result = main(
+                ["--store", str(self.path), "defer", self.proposal.fingerprint, "--until", "bad"]
+            )
+        self.assertEqual(result, 1)
+        self.assertIn("Cannot update proposal", error.getvalue())
+        self.assertNotIn("Traceback", error.getvalue())
+
+
+if __name__ == "__main__":
+    unittest.main()
