@@ -141,6 +141,14 @@ class ProposalStoreInitializationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unsupported store version"):
             store.get("fingerprint")
 
+    def test_records_distinct_observations_idempotently(self) -> None:
+        store = ProposalStore(self.path)
+        store.initialize()
+        first = observation("source-a")
+        second = observation("source-b")
+
+        self.assertTrue(store.record_observation(first))
+        self.assertFalse(store.record_observation(first))
 
 if __name__ == "__main__":
     unittest.main()

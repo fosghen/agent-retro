@@ -153,3 +153,45 @@ class ProposalStore:
                 (fingerprint,),
             ).fetchone()
         return None if row is None else self._proposal(row)
+
+    def record_observation(self, observation: ProposalObservation) -> bool:
+        """Persist one distinct source observation and report whether it was new."""
+        with self._connect() as connection:
+            self._check_version(connection)
+            cursor = connection.execute(
+                "INSERT OR IGNORE INTO occurrences "
+                "(fingerprint, intent, target, scope, source_hash, excerpt) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    observation.fingerprint,
+                    observation.intent,
+                    observation.target,
+                    observation.scope,
+                    observation.evidence.source_hash,
+                    observation.evidence.excerpt,
+                ),
+            )
+        return cursor.rowcount == 1
+
+    def list_observations(self, fingerprint: str) -> list[ProposalObservation]:
+        """Return distinct observations in stable arrival order."""
+        with self._connect() as connection:
+            self._check_version(connection)
+            rows = connection.execute(
+                "SELECT intent, target, scope, source_hash, excerpt FROM occurrences "
+                "WHERE fingerprint = ? ORDER BY id",
+                (fingerprint,),
+            ).fetchall()
+        return [
+            ProposalObservation(intent, target, scope, EvidenceReference(source_hash, excerpt))
+            for intent, target, scope, source_hash, excerpt in rows
+        ]
+
+    def occurrence_count(self, fingerprint: str) -> int:
+        """Return the number of distinct sources recorded for one identity."""
+        with self._connect() as connection:
+            self._check_version(connection)
+            row = connection.execute(
+                "SELECT count(*) FROM occurrences WHERE fingerprint = ?", (fingerprint,)
+            ).fetchone()
+        return int(row[0])
