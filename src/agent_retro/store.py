@@ -10,12 +10,14 @@ from pathlib import Path  # noqa: TC003 -- public constructor accepts Path.
 from agent_retro.models import (
     MAX_PROPOSAL_EVIDENCE,
     SCHEMA_VERSION,
+    AnalyzerCandidate,
     EvidenceReference,
     Proposal,
     ProposalObservation,
     ProposalRevision,
     ProposalStatus,
     StatusEvent,
+    analyzer_candidate_from_mapping,
     proposal_from_mapping,
 )
 
@@ -206,7 +208,11 @@ class ProposalStore:
         return int(row[0])
 
     def aggregate_observation(
-        self, observation: ProposalObservation, *, occurred_at: str | None = None
+        self,
+        observation: ProposalObservation,
+        *,
+        occurred_at: str | None = None,
+        template: AnalyzerCandidate | None = None,
     ) -> Proposal | None:
         """Record evidence and promote recurring observations atomically."""
         with self._connect() as connection:

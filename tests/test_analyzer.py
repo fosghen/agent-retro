@@ -24,3 +24,41 @@ def candidate(source_hash: str = "source-a") -> dict[str, object]:
         "risks": "False positives",
         "validation": "Run evaluations",
     }
+
+
+class AnalyzerCandidateTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.path = Path(self.temporary.name) / "state.sqlite3"
+        self.store = ProposalStore(self.path)
+        self.store.initialize()
+
+    def counts(self) -> tuple[int, int, int, int]:
+        with sqlite3.connect(self.path) as connection:
+            return tuple(
+                connection.execute(query).fetchone()[0]
+                for query in (
+                    "SELECT count(*) FROM occurrences",
+                    "SELECT count(*) FROM proposals",
+                    "SELECT count(*) FROM revisions",
+                    "SELECT count(*) FROM events",
+                )
+            )
+
+    def test_valid_candidates_promote_with_review_fields(self) -> None:
+        self.assertIsNone(self.store.ingest_analyzer_output(candidate()))
+        proposal = self.store.ingest_analyzer_output(candidate("source-b"))
+
+        self.assertEqual(proposal.status, ProposalStatus.NEW)
+        expected = analyzer_candidate_from_mapping(candidate()).revision()
+        self.assertEqual(replace(proposal.revision, evidence=()), expected)
+        self.assertEqual(self.counts(), (2, 1, 1, 0))
+
+        changed = candidate("source-c")
+        changed["title"] = "Updated review rule"
+        revised = self.store.ingest_analyzer_output(changed)
+        self.assertEqual(
+            (revised.revision.number, revised.revision.title), (2, "Updated review rule")
+        )
+        self.assertEqual(len(revised.revision.evidence), 3)
