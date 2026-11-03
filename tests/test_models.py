@@ -2,7 +2,13 @@ import json
 import unittest
 from pathlib import Path
 
-from agent_retro.models import ProposalStatus, SchemaError, proposal_from_mapping
+from agent_retro.models import (
+    EvidenceReference,
+    ProposalObservation,
+    ProposalStatus,
+    SchemaError,
+    proposal_from_mapping,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -40,6 +46,32 @@ class ProposalModelTests(unittest.TestCase):
 
         self.assertEqual(proposal.revision.problem, "Repeated failures")
         self.assertEqual(proposal.revision.validation, "Not recorded")
+
+    def test_observation_fingerprint_normalizes_case_and_whitespace(self) -> None:
+        first = ProposalObservation(
+            " Improve   review ", "Agent Retro", " One file ", EvidenceReference("a", "one")
+        )
+        second = ProposalObservation(
+            "improve review", "agent retro", "one  file", EvidenceReference("b", "two")
+        )
+        punctuated = ProposalObservation(
+            "improve-review", "agent retro", "one file", EvidenceReference("c", "three")
+        )
+
+        self.assertEqual(first.fingerprint, second.fingerprint)
+        self.assertNotEqual(first.fingerprint, punctuated.fingerprint)
+
+    def test_material_scope_changes_observation_fingerprint(self) -> None:
+        first = ProposalObservation("improve", "retro", "one file", EvidenceReference("a", "one"))
+        second = ProposalObservation("improve", "retro", "two files", EvidenceReference("b", "two"))
+
+        self.assertNotEqual(first.fingerprint, second.fingerprint)
+
+    def test_observation_rejects_unbounded_evidence(self) -> None:
+        with self.assertRaisesRegex(SchemaError, "source_hash"):
+            ProposalObservation("intent", "target", "scope", EvidenceReference("x" * 129, "ok"))
+        with self.assertRaisesRegex(SchemaError, "excerpt"):
+            ProposalObservation("intent", "target", "scope", EvidenceReference("x", "y" * 501))
 
 
 if __name__ == "__main__":

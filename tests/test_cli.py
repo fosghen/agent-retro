@@ -107,7 +107,7 @@ class CliTests(unittest.TestCase):
     def test_forward_store_version_reports_bounded_error(self) -> None:
         ProposalStore(self.store_path).initialize()
         with sqlite3.connect(self.store_path) as connection:
-            connection.execute("PRAGMA user_version = 2")
+            connection.execute("PRAGMA user_version = 3")
         error = io.StringIO()
         with redirect_stderr(error):
             result = main(["--store", str(self.store_path), "list"])
