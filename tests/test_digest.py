@@ -86,3 +86,48 @@ class DailyDigestTests(unittest.TestCase):
         with redirect_stdout(output_stream):
             self.assertEqual(main(["--store", str(self.path), "digest"]), 0)
         return output_stream.getvalue()
+
+    def test_cli_emits_only_meaningful_privacy_safe_latest_changes_once(self) -> None:
+        fingerprint = self.seed_changes()
+        rendered = self.run_digest()
+        for expected in (
+            "Analyzed sessions: 1",
+            "Skipped sessions: 1",
+            "created as new",
+            "new → approved",
+            "`logs/c.log`",
+        ):
+            self.assertIn(expected, rendered)
+        for excluded in (
+            "raw private detail",
+            "private-",
+            "private evidence",
+            fingerprint,
+            "logs/a.log",
+            "logs/b.log",
+            "logs/b-final.log",
+        ):
+            self.assertNotIn(excluded, rendered)
+        self.assertEqual(self.run_digest(), "")
+
+    def test_failed_output_leaves_snapshot_available_for_retry(self) -> None:
+        self.seed_changes()
+        with (
+            patch("agent_retro.cli._write", side_effect=OSError("closed")),
+            self.assertRaises(OSError),
+        ):
+            main(["--store", str(self.path), "digest"])
+        with sqlite3.connect(self.path) as connection:
+            cursor = connection.execute("SELECT run_id, event_id FROM digest_cursor").fetchone()
+        self.assertEqual(cursor, (0, 0))
+        self.assertIn("`logs/c.log`", self.run_digest())
+
+    def test_empty_run_and_missing_store_are_silent(self) -> None:
+        self.store.record_daily_run(DailyRun("2026-11-03", "now", ()))
+        self.assertEqual(self.run_digest(), "")
+        with sqlite3.connect(self.path) as connection:
+            cursor = connection.execute("SELECT run_id, event_id FROM digest_cursor").fetchone()
+        self.assertEqual(cursor, (0, 0))
+        with patch("agent_retro.cli._write") as write:
+            self.assertEqual(main(["--store", str(self.path.with_name("missing")), "digest"]), 0)
+        write.assert_not_called()
