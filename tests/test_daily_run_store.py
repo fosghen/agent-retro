@@ -45,3 +45,51 @@ class DailyRunStoreTests(unittest.TestCase):
         self.assertEqual(self.store.list_daily_runs(), [(first_id, first), (second_id, second)])
         self.assertEqual(self.store.list_daily_runs(after_id=first_id), [(second_id, second)])
         self.assertEqual(self.counts(), (2, 3))
+
+    def test_retry_query_returns_only_resumable_failures_with_logs(self) -> None:
+        self.store.record_daily_run(
+            run(
+                2,
+                outcome("session-a", SessionOutcomeStatus.FAILED, retryable=True),
+                outcome("session-b", SessionOutcomeStatus.FAILED, retryable=True),
+            )
+        )
+        retryable = outcome("session-c", SessionOutcomeStatus.FAILED, retryable=True)
+        self.store.record_daily_run(
+            run(
+                3,
+                outcome("session-a"),
+                outcome("session-b", SessionOutcomeStatus.FAILED),
+                retryable,
+            )
+        )
+        self.assertEqual(self.store.retryable_failures(), [retryable])
+
+    def test_database_failure_and_forward_version_never_partially_write(self) -> None:
+        with sqlite3.connect(self.path) as connection:
+            connection.execute(
+                "CREATE TRIGGER fail_outcome BEFORE INSERT ON daily_outcomes "
+                "WHEN NEW.session_hash = 'session-b' "
+                "BEGIN SELECT RAISE(FAIL, 'injected'); END"
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.store.record_daily_run(run(3, outcome("session-a"), outcome("session-b")))
+        self.assertEqual(self.counts(), (0, 0))
+
+        with sqlite3.connect(self.path) as connection:
+            connection.execute("DROP TRIGGER fail_outcome")
+            connection.execute("PRAGMA user_version = 5")
+        with self.assertRaisesRegex(ValueError, "unsupported store version"):
+            self.store.record_daily_run(run(3, outcome("session-a")))
+        self.assertEqual(self.counts(), (0, 0))
+
+    def test_corrupt_outcome_and_invalid_cursor_fail_closed(self) -> None:
+        run_id = self.store.record_daily_run(run(3, outcome("session-a")))
+        with sqlite3.connect(self.path) as connection:
+            connection.execute(
+                "UPDATE daily_outcomes SET retryable = 2 WHERE run_id = ?", (run_id,)
+            )
+        with self.assertRaisesRegex(ValueError, "invalid stored daily outcome"):
+            self.store.list_daily_runs()
+        with self.assertRaisesRegex(ValueError, "after_id"):
+            self.store.list_daily_runs(after_id=-1)
