@@ -26,7 +26,9 @@ from agent_retro.transcript_io import (
 )
 from agent_retro.transcript_metadata import (
     buffered_jsonl_records as _jsonl_records,
+    codex_prompt as _codex_prompt,
     extract_json_field,
+    is_injected_user_text as _is_injected_user_text,
 )
 from agent_retro.transcript_normalize import stream_normalized_jsonl as stream_jsonl
 
@@ -41,32 +43,6 @@ PRICE_PER_M = {
 }
 
 SCHEMA_VERSION = "0.1.0"
-
-
-def _is_injected_user_text(text):
-    return text.lstrip().startswith((
-        "<system-reminder>",
-        "<environment_context>",
-        "# AGENTS.md instructions for ",
-    ))
-
-
-def _codex_prompt(records):
-    """Find the first non-injected Codex user prompt."""
-    for record in records:
-        payload = record.get("payload") or {}
-        if record.get("type") != "response_item" or payload.get("type") != "message":
-            continue
-        if payload.get("role") != "user":
-            continue
-        blocks = payload.get("content") or []
-        text = "".join(
-            block.get("text", "") for block in blocks
-            if isinstance(block, dict)
-        ).strip()
-        if text and not _is_injected_user_text(text):
-            return text[:200]
-    return None
 
 
 def _codex_metadata_lite(path, head, tail, size):

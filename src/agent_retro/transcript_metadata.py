@@ -54,9 +54,7 @@ def codex_prompt(records: Iterable[Mapping[str, Any]]) -> str | None:
         if payload.get("role") != "user":
             continue
         blocks = payload.get("content") or []
-        text = "".join(
-            block.get("text", "") for block in blocks if isinstance(block, dict)
-        ).strip()
+        text = "".join(block.get("text", "") for block in blocks if isinstance(block, dict)).strip()
         if text and not is_injected_user_text(text):
             return text[:200]
     return None
