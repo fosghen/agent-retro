@@ -5,13 +5,18 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
+from datetime import date
 from enum import StrEnum
+from pathlib import PurePosixPath
 
 SCHEMA_VERSION = 1
 MAX_EXCERPT_CHARS = 500
 MAX_PROPOSAL_EVIDENCE = 5
 MAX_SOURCE_HASH_CHARS = 128
 MAX_STRUCTURED_TEXT_CHARS = 1000
+MAX_RUN_DETAIL_CHARS = 500
+MAX_COMPLETED_AT_CHARS = 100
+MAX_RUN_OUTCOMES = 100
 
 
 class SchemaError(ValueError):
@@ -28,6 +33,94 @@ class ProposalStatus(StrEnum):
     IMPLEMENTING = "implementing"
     IMPLEMENTED = "implemented"
     FAILED = "failed"
+
+
+class SessionOutcomeStatus(StrEnum):
+    """Privacy-safe result of processing one local session."""
+
+    ANALYZED = "analyzed"
+    SKIPPED = "skipped"
+    FAILED = "failed"
+
+
+@dataclass(frozen=True)
+class DailySessionOutcome:
+    """Bounded derived metadata for one session, never transcript content."""
+
+    session_hash: str
+    status: SessionOutcomeStatus
+    detail: str
+    retryable: bool = False
+    log_ref: str | None = None
+
+    def __post_init__(self) -> None:
+        """Reject unbounded identifiers, details, and unsafe log references."""
+        if (
+            not isinstance(self.session_hash, str)
+            or not self.session_hash.strip()
+            or len(self.session_hash) > MAX_SOURCE_HASH_CHARS
+        ):
+            raise SchemaError("invalid session hash")  # noqa: EM101, TRY003
+        if not isinstance(self.status, SessionOutcomeStatus):
+            raise SchemaError("invalid session outcome status")  # noqa: EM101, TRY003
+        if (
+            not isinstance(self.detail, str)
+            or not self.detail.strip()
+            or len(self.detail) > MAX_RUN_DETAIL_CHARS
+        ):
+            raise SchemaError("invalid session outcome detail")  # noqa: EM101, TRY003
+        if not isinstance(self.retryable, bool):
+            raise SchemaError("retryable must be a boolean")  # noqa: EM101, TRY003
+        if self.status is SessionOutcomeStatus.FAILED and not self.log_ref:
+            raise SchemaError("failed sessions require a retry log")  # noqa: EM101, TRY003
+        if self.status is not SessionOutcomeStatus.FAILED and (self.retryable or self.log_ref):
+            raise SchemaError("only failed sessions have retry state")  # noqa: EM101, TRY003
+        if self.log_ref is not None:
+            if not isinstance(self.log_ref, str) or not self.log_ref.strip():
+                raise SchemaError("invalid local log reference")  # noqa: EM101, TRY003
+            path = PurePosixPath(self.log_ref)
+            if (
+                len(self.log_ref) > MAX_RUN_DETAIL_CHARS
+                or self.log_ref != path.as_posix()
+                or path.parent != PurePosixPath("logs")
+                or path.suffix != ".log"
+            ):
+                raise SchemaError("invalid local log reference")  # noqa: EM101, TRY003
+
+
+@dataclass(frozen=True)
+class DailyRun:
+    """One completed daily analysis run with privacy-safe outcomes."""
+
+    run_date: str
+    completed_at: str
+    outcomes: tuple[DailySessionOutcome, ...]
+
+    def __post_init__(self) -> None:
+        """Require an ISO date, bounded timestamp, and unique sessions."""
+        if not isinstance(self.run_date, str):
+            raise SchemaError("run date must use YYYY-MM-DD")  # noqa: EM101, TRY003
+        try:
+            parsed = date.fromisoformat(self.run_date)
+        except ValueError as error:
+            raise SchemaError("run date must use YYYY-MM-DD") from error  # noqa: EM101, TRY003
+        if parsed.isoformat() != self.run_date:
+            raise SchemaError("run date must use YYYY-MM-DD")  # noqa: EM101, TRY003
+        if (
+            not isinstance(self.completed_at, str)
+            or not self.completed_at.strip()
+            or len(self.completed_at) > MAX_COMPLETED_AT_CHARS
+        ):
+            raise SchemaError("invalid completion timestamp")  # noqa: EM101, TRY003
+        if not isinstance(self.outcomes, tuple) or not all(
+            isinstance(item, DailySessionOutcome) for item in self.outcomes
+        ):
+            raise SchemaError("outcomes must be typed session metadata")  # noqa: EM101, TRY003
+        if len(self.outcomes) > MAX_RUN_OUTCOMES:
+            raise SchemaError("too many session outcomes")  # noqa: EM101, TRY003
+        hashes = [item.session_hash for item in self.outcomes]
+        if len(hashes) != len(set(hashes)):
+            raise SchemaError("duplicate session outcome")  # noqa: EM101, TRY003
 
 
 @dataclass(frozen=True)
@@ -267,4 +360,26 @@ def analyzer_candidate_from_mapping(value: object) -> AnalyzerCandidate:
     )
     return AnalyzerCandidate(
         version, observation, *(_bounded_text(root.get(name), name) for name in fields)
+    )
+
+
+def daily_session_outcome_from_mapping(value: object) -> DailySessionOutcome:
+    """Validate an untrusted privacy-safe session outcome mapping."""
+    root = _mapping(value, "session outcome")
+    if set(root) - {"session_hash", "status", "detail", "retryable", "log_ref"}:
+        raise SchemaError("session outcome contains unsupported fields")  # noqa: EM101, TRY003
+    try:
+        status = SessionOutcomeStatus(_text(root.get("status"), "status"))
+    except ValueError as error:
+        raise SchemaError("session outcome status is unknown") from error  # noqa: EM101, TRY003
+    retryable = root.get("retryable", False)
+    if not isinstance(retryable, bool):
+        raise SchemaError("retryable must be a boolean")  # noqa: EM101, TRY003
+    log_ref = None if root.get("log_ref") is None else _text(root.get("log_ref"), "log_ref")
+    return DailySessionOutcome(
+        _text(root.get("session_hash"), "session_hash"),
+        status,
+        _text(root.get("detail"), "detail"),
+        retryable,
+        log_ref,
     )
