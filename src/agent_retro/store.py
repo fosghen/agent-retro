@@ -321,7 +321,14 @@ class ProposalStore:
         self, value: object, *, occurred_at: str | None = None
     ) -> Proposal | None:
         """Validate a candidate completely before starting durable ingestion."""
-        candidate = analyzer_candidate_from_mapping(value)
+        return self.ingest_candidate(
+            analyzer_candidate_from_mapping(value), occurred_at=occurred_at
+        )
+
+    def ingest_candidate(
+        self, candidate: AnalyzerCandidate, *, occurred_at: str | None = None
+    ) -> Proposal | None:
+        """Persist an already validated analyzer candidate."""
         return self.aggregate_observation(
             candidate.observation, occurred_at=occurred_at, template=candidate
         )
