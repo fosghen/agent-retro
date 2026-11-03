@@ -62,3 +62,10 @@ class AnalyzerCandidateTests(unittest.TestCase):
             (revised.revision.number, revised.revision.title), (2, "Updated review rule")
         )
         self.assertEqual(len(revised.revision.evidence), 3)
+
+    def test_parser_rejects_missing_review_field(self) -> None:
+        value = candidate()
+        value.pop("validation")
+
+        with self.assertRaisesRegex(SchemaError, "validation"):
+            analyzer_candidate_from_mapping(value)

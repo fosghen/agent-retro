@@ -246,16 +246,20 @@ class ProposalStore:
             )
             if current is None:
                 intent, target, scope, _, _ = rows[0]
-                revision = ProposalRevision(
-                    1,
-                    " ".join(intent.split()),
-                    f"Observed in {len(rows)} distinct sources.",
-                    target,
-                    evidence,
-                    problem=intent,
-                    affected_workflow=target,
-                    proposed_artifact=target,
-                    scope=scope,
+                revision = (
+                    replace(template.revision(), evidence=evidence)
+                    if template is not None
+                    else ProposalRevision(
+                        1,
+                        " ".join(intent.split()),
+                        f"Observed in {len(rows)} distinct sources.",
+                        target,
+                        evidence,
+                        problem=intent,
+                        affected_workflow=target,
+                        proposed_artifact=target,
+                        scope=scope,
+                    )
                 )
                 proposal = Proposal(
                     SCHEMA_VERSION, observation.fingerprint, ProposalStatus.NEW, revision
@@ -265,11 +269,19 @@ class ProposalStore:
                     (proposal.fingerprint, proposal.schema_version, proposal.status.value, 1),
                 )
             else:
-                revision = replace(
-                    current.revision,
-                    number=current.revision.number + 1,
-                    rationale=f"Observed in {len(rows)} distinct sources.",
-                    evidence=evidence,
+                revision = (
+                    replace(
+                        template.revision(),
+                        number=current.revision.number + 1,
+                        evidence=evidence,
+                    )
+                    if template is not None
+                    else replace(
+                        current.revision,
+                        number=current.revision.number + 1,
+                        rationale=f"Observed in {len(rows)} distinct sources.",
+                        evidence=evidence,
+                    )
                 )
                 reopened = current.status is ProposalStatus.REJECTED
                 if reopened and not occurred_at:
