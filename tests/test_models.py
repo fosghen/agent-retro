@@ -32,6 +32,15 @@ class ProposalModelTests(unittest.TestCase):
         with self.assertRaises(SchemaError):
             proposal.transition(ProposalStatus.IMPLEMENTED)
 
+    def test_review_fields_are_validated_and_backward_compatible(self) -> None:
+        raw = fixture("proposal_valid.json")
+        self.assertIsInstance(raw, dict)
+        raw["revision"]["problem"] = "Repeated failures"
+        proposal = proposal_from_mapping(raw)
+
+        self.assertEqual(proposal.revision.problem, "Repeated failures")
+        self.assertEqual(proposal.revision.validation, "Not recorded")
+
 
 if __name__ == "__main__":
     unittest.main()
