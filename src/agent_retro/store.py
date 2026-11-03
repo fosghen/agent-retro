@@ -20,9 +20,9 @@ from agent_retro.models import (
     ProposalRevision,
     ProposalStatus,
     SchemaError,
+    SessionOutcomeStatus,
     StatusEvent,
     analyzer_candidate_from_mapping,
-    SessionOutcomeStatus,
     proposal_from_mapping,
 )
 
@@ -138,6 +138,48 @@ class ProposalStore:
                 ),
             )
         return run_id
+
+    @staticmethod
+    def _daily_outcome(row: tuple[object, ...]) -> DailySessionOutcome:
+        session_hash, status, detail, retryable, log_ref = row
+        if (
+            not isinstance(session_hash, str)
+            or not isinstance(status, str)
+            or not isinstance(detail, str)
+            or not isinstance(retryable, int)
+            or isinstance(retryable, bool)
+            or retryable not in {0, 1}
+            or (log_ref is not None and not isinstance(log_ref, str))
+        ):
+            raise SchemaError("invalid stored daily outcome")  # noqa: EM101, TRY003
+        return DailySessionOutcome(
+            session_hash,
+            SessionOutcomeStatus(status),
+            detail,
+            bool(retryable),
+            log_ref,
+        )
+
+    def list_daily_runs(self, *, after_id: int = 0) -> list[tuple[int, DailyRun]]:
+        """Return daily runs and their derived outcomes in stable order."""
+        if not isinstance(after_id, int) or isinstance(after_id, bool) or after_id < 0:
+            raise ValueError("after_id must not be negative")  # noqa: EM101, TRY003
+        with self._connect() as connection:
+            self._check_version(connection)
+            runs = connection.execute(
+                "SELECT id, run_date, completed_at FROM daily_runs WHERE id > ? ORDER BY id",
+                (after_id,),
+            ).fetchall()
+            result = []
+            for run_id, run_date, completed_at in runs:
+                rows = connection.execute(
+                    "SELECT session_hash, status, detail, retryable, log_ref "
+                    "FROM daily_outcomes WHERE run_id = ? ORDER BY rowid",
+                    (run_id,),
+                ).fetchall()
+                outcomes = tuple(self._daily_outcome(row) for row in rows)
+                result.append((int(run_id), DailyRun(str(run_date), str(completed_at), outcomes)))
+        return result
 
     def save(self, proposal: Proposal, event: StatusEvent) -> None:
         """Atomically store one proposal revision and its append-only event."""
