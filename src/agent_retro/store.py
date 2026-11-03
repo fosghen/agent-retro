@@ -4,19 +4,23 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path  # noqa: TC003 -- public constructor accepts Path.
 
 from agent_retro.models import (
+    MAX_PROPOSAL_EVIDENCE,
+    SCHEMA_VERSION,
     EvidenceReference,
     Proposal,
     ProposalObservation,
+    ProposalRevision,
     ProposalStatus,
     StatusEvent,
     proposal_from_mapping,
 )
 
 STORE_VERSION = 2
+PROMOTION_OCCURRENCES = 2
 
 
 class ProposalStore:
@@ -158,19 +162,24 @@ class ProposalStore:
         """Persist one distinct source observation and report whether it was new."""
         with self._connect() as connection:
             self._check_version(connection)
-            cursor = connection.execute(
-                "INSERT OR IGNORE INTO occurrences "
-                "(fingerprint, intent, target, scope, source_hash, excerpt) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (
-                    observation.fingerprint,
-                    observation.intent,
-                    observation.target,
-                    observation.scope,
-                    observation.evidence.source_hash,
-                    observation.evidence.excerpt,
-                ),
-            )
+            return self._insert_observation(connection, observation)
+
+    @staticmethod
+    def _insert_observation(
+        connection: sqlite3.Connection, observation: ProposalObservation
+    ) -> bool:
+        cursor = connection.execute(
+            "INSERT OR IGNORE INTO occurrences "
+            "(fingerprint, intent, target, scope, source_hash, excerpt) VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                observation.fingerprint,
+                observation.intent,
+                observation.target,
+                observation.scope,
+                observation.evidence.source_hash,
+                observation.evidence.excerpt,
+            ),
+        )
         return cursor.rowcount == 1
 
     def list_observations(self, fingerprint: str) -> list[ProposalObservation]:
@@ -195,3 +204,71 @@ class ProposalStore:
                 "SELECT count(*) FROM occurrences WHERE fingerprint = ?", (fingerprint,)
             ).fetchone()
         return int(row[0])
+
+    def aggregate_observation(self, observation: ProposalObservation) -> Proposal | None:
+        """Record evidence and promote recurring observations atomically."""
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            self._check_version(connection)
+            inserted = self._insert_observation(connection, observation)
+            rows = connection.execute(
+                "SELECT intent, target, scope, source_hash, excerpt FROM occurrences "
+                "WHERE fingerprint = ? ORDER BY id",
+                (observation.fingerprint,),
+            ).fetchall()
+            if len(rows) < PROMOTION_OCCURRENCES:
+                return None
+            current_row = connection.execute(
+                "SELECT p.schema_version, p.fingerprint, p.status, r.payload "
+                "FROM proposals p JOIN revisions r ON r.fingerprint = p.fingerprint "
+                "AND r.revision = p.current_revision WHERE p.fingerprint = ?",
+                (observation.fingerprint,),
+            ).fetchone()
+            current = None if current_row is None else self._proposal(current_row)
+            if current is not None and (not inserted or current.status is not ProposalStatus.NEW):
+                return current
+            evidence = tuple(
+                EvidenceReference(source_hash, excerpt)
+                for _, _, _, source_hash, excerpt in rows[-MAX_PROPOSAL_EVIDENCE:]
+            )
+            if current is None:
+                intent, target, scope, _, _ = rows[0]
+                revision = ProposalRevision(
+                    1,
+                    " ".join(intent.split()),
+                    f"Observed in {len(rows)} distinct sources.",
+                    target,
+                    evidence,
+                    problem=intent,
+                    affected_workflow=target,
+                    proposed_artifact=target,
+                    scope=scope,
+                )
+                proposal = Proposal(
+                    SCHEMA_VERSION, observation.fingerprint, ProposalStatus.NEW, revision
+                )
+                connection.execute(
+                    "INSERT INTO proposals VALUES (?, ?, ?, ?)",
+                    (proposal.fingerprint, proposal.schema_version, proposal.status.value, 1),
+                )
+            else:
+                revision = replace(
+                    current.revision,
+                    number=current.revision.number + 1,
+                    rationale=f"Observed in {len(rows)} distinct sources.",
+                    evidence=evidence,
+                )
+                proposal = replace(current, revision=revision)
+                connection.execute(
+                    "UPDATE proposals SET current_revision = ? WHERE fingerprint = ?",
+                    (revision.number, proposal.fingerprint),
+                )
+            connection.execute(
+                "INSERT INTO revisions VALUES (?, ?, ?)",
+                (
+                    proposal.fingerprint,
+                    revision.number,
+                    json.dumps(asdict(revision), sort_keys=True),
+                ),
+            )
+        return proposal

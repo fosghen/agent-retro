@@ -1,3 +1,4 @@
+import json
 import sqlite3
 import tempfile
 import unittest
@@ -198,6 +199,107 @@ class ProposalStoreInitializationTests(unittest.TestCase):
         with sqlite3.connect(self.path) as connection:
             count = connection.execute("SELECT count(*) FROM occurrences").fetchone()[0]
         self.assertEqual(count, 0)
+
+    def test_second_observation_promotes_once_and_third_revises(self) -> None:
+        store = ProposalStore(self.path)
+        store.initialize()
+        first, second, third = (observation(f"source-{value}") for value in "abc")
+
+        self.assertIsNone(store.aggregate_observation(first))
+        self.assertIsNone(store.aggregate_observation(first))
+        promoted = store.aggregate_observation(second)
+        self.assertEqual(promoted.status, ProposalStatus.NEW)
+        self.assertEqual(promoted.revision.number, 1)
+        self.assertEqual(store.aggregate_observation(second), promoted)
+        revised = store.aggregate_observation(third)
+        self.assertEqual(revised.revision.number, 2)
+        self.assertEqual(
+            [item.source_hash for item in revised.revision.evidence],
+            ["source-a", "source-b", "source-c"],
+        )
+        with sqlite3.connect(self.path) as connection:
+            self.assertEqual(connection.execute("SELECT count(*) FROM proposals").fetchone()[0], 1)
+            self.assertEqual(connection.execute("SELECT count(*) FROM revisions").fetchone()[0], 2)
+            payloads = connection.execute(
+                "SELECT payload FROM revisions WHERE fingerprint = ? ORDER BY revision",
+                (promoted.fingerprint,),
+            ).fetchall()
+        evidence = [
+            [item["source_hash"] for item in json.loads(row[0])["evidence"]] for row in payloads
+        ]
+        self.assertEqual(evidence, [["source-a", "source-b"], ["source-a", "source-b", "source-c"]])
+
+    def test_aggregation_bounds_evidence_and_separates_scope(self) -> None:
+        store = ProposalStore(self.path)
+        store.initialize()
+        proposal = None
+        for index in range(7):
+            proposal = store.aggregate_observation(observation(f"source-{index}"))
+        self.assertEqual(
+            [item.source_hash for item in proposal.revision.evidence],
+            [f"source-{index}" for index in range(2, 7)],
+        )
+
+        other = store.aggregate_observation(observation("other-a", scope="two files"))
+        self.assertIsNone(other)
+        other = store.aggregate_observation(observation("other-b", scope="two files"))
+        self.assertNotEqual(proposal.fingerprint, other.fingerprint)
+        with sqlite3.connect(self.path) as connection:
+            self.assertEqual(connection.execute("SELECT count(*) FROM proposals").fetchone()[0], 2)
+
+    def test_aggregation_resumes_existing_history(self) -> None:
+        store = ProposalStore(self.path)
+        store.initialize()
+        first, second = observation("source-a"), observation("source-b")
+        store.record_observation(first)
+        store.record_observation(second)
+
+        promoted = store.aggregate_observation(second)
+        self.assertEqual(promoted.revision.number, 1)
+
+    def test_aggregation_does_not_revise_non_new_proposal(self) -> None:
+        store = ProposalStore(self.path)
+        store.initialize()
+        store.aggregate_observation(observation("source-a"))
+        promoted = store.aggregate_observation(observation("source-b"))
+        rejected = promoted.transition(ProposalStatus.REJECTED)
+        store.save(
+            rejected,
+            StatusEvent(
+                1, rejected.fingerprint, ProposalStatus.NEW, ProposalStatus.REJECTED, "now"
+            ),
+        )
+
+        result = store.aggregate_observation(observation("source-c"))
+        self.assertEqual(result, rejected)
+        self.assertEqual(store.occurrence_count(rejected.fingerprint), 3)
+        with sqlite3.connect(self.path) as connection:
+            self.assertEqual(connection.execute("SELECT count(*) FROM revisions").fetchone()[0], 1)
+
+    def test_aggregation_rolls_back_observation_on_failure(self) -> None:
+        store = ProposalStore(self.path)
+        store.initialize()
+        first, second = observation("source-a"), observation("source-b")
+        store.aggregate_observation(first)
+        with sqlite3.connect(self.path) as connection:
+            connection.execute(
+                "CREATE TRIGGER fail_proposal BEFORE INSERT ON proposals "
+                "BEGIN SELECT RAISE(ABORT, 'injected'); END"
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            store.aggregate_observation(second)
+        self.assertEqual(store.occurrence_count(first.fingerprint), 1)
+        self.assertIsNone(store.get(first.fingerprint))
+        with sqlite3.connect(self.path) as connection:
+            connection.execute("DROP TRIGGER fail_proposal")
+        self.assertEqual(store.aggregate_observation(second).revision.number, 1)
+        self.assertEqual(store.occurrence_count(first.fingerprint), 2)
+        with sqlite3.connect(self.path) as connection:
+            counts = (
+                connection.execute("SELECT count(*) FROM proposals").fetchone()[0],
+                connection.execute("SELECT count(*) FROM revisions").fetchone()[0],
+            )
+        self.assertEqual(counts, (1, 1))
 
 
 if __name__ == "__main__":
