@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _SECRET_VALUE = re.compile(r"(?i)\b(password|token)\s*[:=]\s*([^\s]+)")
 _BEARER_VALUE = re.compile(r"(?i)(authorization\s*:\s*bearer)\s+([^\s]+)")

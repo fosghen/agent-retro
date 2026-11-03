@@ -1,7 +1,6 @@
 """Run the pinned, offline agent-configuration quality gate."""
 
-import subprocess  # noqa: S404  # nosec B404
-
+import subprocess  # nosec B404
 
 COMMAND = ["agnix", "--strict", "--target", "codex", "."]
 

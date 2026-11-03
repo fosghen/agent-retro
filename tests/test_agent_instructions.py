@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-
 AGENT_INSTRUCTIONS = (Path(__file__).resolve().parents[1] / "AGENTS.md").read_text()
 
 

@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-
 SKILL = (Path(__file__).resolve().parents[1] / "SKILL.md").read_text()
 OPENAI_METADATA = Path(__file__).resolve().parents[1] / "agents" / "openai.yaml"
 

@@ -58,4 +58,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["D"]
+"tests/**" = [
+    "D",
+    "S101", # Plain asserts are the native pytest assertion interface.
+]
