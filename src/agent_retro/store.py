@@ -7,6 +7,7 @@ import sqlite3
 from dataclasses import asdict, replace
 from datetime import UTC, date, datetime
 from pathlib import Path  # noqa: TC003 -- public constructor accepts Path.
+from typing import TYPE_CHECKING
 
 from agent_retro.models import (
     MAX_PROPOSAL_EVIDENCE,
@@ -26,7 +27,10 @@ from agent_retro.models import (
     proposal_from_mapping,
 )
 
-STORE_VERSION = 4
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+STORE_VERSION = 5
 PROMOTION_OCCURRENCES = 2
 MAX_DECISION_REASON_CHARS = 1000
 
@@ -59,11 +63,14 @@ class ProposalStore:
             if version == 1:
                 self._migrate_v2(connection)
                 version = 2
-            if version == STORE_VERSION - 2:
+            if version == STORE_VERSION - 3:
                 self._migrate_v3(connection)
                 version = 3
-            if version == STORE_VERSION - 1:
+            if version == STORE_VERSION - 2:
                 self._migrate_v4(connection)
+                version = 4
+            if version == STORE_VERSION - 1:
+                self._migrate_v5(connection)
 
     def _migrate_v1(self, connection: sqlite3.Connection) -> None:
         connection.execute(
@@ -110,6 +117,14 @@ class ProposalStore:
             "FOREIGN KEY(run_id) REFERENCES daily_runs(id))"
         )
         connection.execute("PRAGMA user_version = 4")
+
+    def _migrate_v5(self, connection: sqlite3.Connection) -> None:
+        connection.execute(
+            "CREATE TABLE digest_cursor (singleton INTEGER PRIMARY KEY CHECK(singleton = 1), "
+            "run_id INTEGER NOT NULL, event_id INTEGER NOT NULL)"
+        )
+        connection.execute("INSERT INTO digest_cursor VALUES (1, 0, 0)")
+        connection.execute("PRAGMA user_version = 5")
 
     def record_daily_run(self, run: DailyRun) -> int:
         """Atomically persist one privacy-safe daily run summary."""
