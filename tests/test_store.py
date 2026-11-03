@@ -149,6 +149,56 @@ class ProposalStoreInitializationTests(unittest.TestCase):
 
         self.assertTrue(store.record_observation(first))
         self.assertFalse(store.record_observation(first))
+        self.assertTrue(store.record_observation(second))
+        self.assertEqual(store.occurrence_count(first.fingerprint), 2)
+        self.assertEqual(store.list_observations(first.fingerprint), [first, second])
+
+    def test_material_scope_has_separate_history(self) -> None:
+        store = ProposalStore(self.path)
+        store.initialize()
+        first = observation("source-a")
+        other = observation("source-b", scope="two files")
+        store.record_observation(first)
+        store.record_observation(other)
+        self.assertEqual(store.list_observations(first.fingerprint), [first])
+        self.assertEqual(store.list_observations(other.fingerprint), [other])
+
+    def test_failed_v2_migration_rolls_back_and_can_retry(self) -> None:
+        store = ProposalStore(self.path)
+        self.path.parent.mkdir(parents=True)
+        with sqlite3.connect(self.path) as connection:
+            store._migrate_v1(connection)  # noqa: SLF001 -- build a real legacy database.
+        store.save(proposal(), event())
+
+        class BrokenStore(ProposalStore):
+            def _migrate_v2(self, connection: sqlite3.Connection) -> None:
+                super()._migrate_v2(connection)
+                raise RuntimeError
+
+        with self.assertRaises(RuntimeError):
+            BrokenStore(self.path).initialize()
+        with sqlite3.connect(self.path) as connection:
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 1)
+            self.assertEqual(connection.execute("SELECT count(*) FROM proposals").fetchone()[0], 1)
+            self.assertIsNone(
+                connection.execute(
+                    "SELECT name FROM sqlite_master WHERE name = 'occurrences'"
+                ).fetchone()
+            )
+        store.initialize()
+        self.assertEqual(store.get("fingerprint"), proposal())
+
+    def test_forward_version_rejects_observation_before_write(self) -> None:
+        store = ProposalStore(self.path)
+        store.initialize()
+        with sqlite3.connect(self.path) as connection:
+            connection.execute("PRAGMA user_version = 3")
+        with self.assertRaisesRegex(ValueError, "unsupported store version"):
+            store.record_observation(observation("source-a"))
+        with sqlite3.connect(self.path) as connection:
+            count = connection.execute("SELECT count(*) FROM occurrences").fetchone()[0]
+        self.assertEqual(count, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
