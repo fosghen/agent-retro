@@ -84,6 +84,50 @@ class ProposalStoreInitializationTests(unittest.TestCase):
 
         ProposalStore(self.path).initialize()
 
+    def test_lists_proposals_in_stable_order_with_status_filter(self) -> None:
+        store = ProposalStore(self.path)
+        store.initialize()
+        approved = proposal()
+        new = Proposal(
+            1,
+            "another",
+            ProposalStatus.NEW,
+            ProposalRevision(1, "Another", "Reason", "target", ()),
+        )
+        store.save(approved, event())
+        store.save(
+            new,
+            StatusEvent(1, "another", ProposalStatus.NEW, ProposalStatus.NEW, "now"),
+        )
+
+        self.assertEqual(
+            [item.fingerprint for item in store.list_proposals()],
+            ["another", "fingerprint"],
+        )
+        self.assertEqual(store.list_proposals(ProposalStatus.APPROVED), [approved])
+
+    def test_get_returns_current_revision_or_none(self) -> None:
+        store = ProposalStore(self.path)
+        store.initialize()
+        store.save(proposal(), event())
+
+        self.assertEqual(store.get("fingerprint"), proposal())
+        self.assertIsNone(store.get("missing"))
+
+    def test_read_rejects_corrupt_relation_and_forward_version(self) -> None:
+        store = ProposalStore(self.path)
+        store.initialize()
+        store.save(proposal(), event())
+        with sqlite3.connect(self.path) as connection:
+            connection.execute("DELETE FROM revisions")
+        with self.assertRaises(ValueError):
+            store.list_proposals()
+
+        with sqlite3.connect(self.path) as connection:
+            connection.execute("PRAGMA user_version = 2")
+        with self.assertRaisesRegex(ValueError, "unsupported store version"):
+            store.get("fingerprint")
+
 
 if __name__ == "__main__":
     unittest.main()
