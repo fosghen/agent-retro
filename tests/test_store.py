@@ -274,10 +274,11 @@ class ProposalStoreInitializationTests(unittest.TestCase):
         )
 
         result = store.aggregate_observation(observation("source-c"))
-        self.assertEqual(result, approved)
+        self.assertEqual(result.status, ProposalStatus.APPROVED)
+        self.assertEqual(result.revision.number, 2)
         self.assertEqual(store.occurrence_count(approved.fingerprint), 3)
         with sqlite3.connect(self.path) as connection:
-            self.assertEqual(connection.execute("SELECT count(*) FROM revisions").fetchone()[0], 1)
+            self.assertEqual(connection.execute("SELECT count(*) FROM revisions").fetchone()[0], 2)
 
     def test_aggregation_rolls_back_observation_on_failure(self) -> None:
         store = ProposalStore(self.path)

@@ -64,3 +64,30 @@ class ApprovalTests(unittest.TestCase):
         with self.assertRaises(SchemaError):
             self.store.approve(self.proposal.fingerprint, 1, "again")
         self.assertEqual(self.counts(), (1, 1))
+
+    def test_stale_revision_and_database_failure_roll_back(self) -> None:
+        self.store.aggregate_observation(observation("source-c"))
+        with self.assertRaisesRegex(SchemaError, "stale"):
+            self.store.approve(self.proposal.fingerprint, 1, "now")
+        self.assertEqual(self.counts(), (0, 0))
+
+        with sqlite3.connect(self.path) as connection:
+            connection.execute(
+                "CREATE TRIGGER fail_approval BEFORE UPDATE ON proposals "
+                "BEGIN SELECT RAISE(FAIL, 'injected'); END"
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.store.approve(self.proposal.fingerprint, 2, "now")
+        self.assertEqual(self.counts(), (0, 0))
+        with sqlite3.connect(self.path) as connection:
+            state = connection.execute("SELECT status, current_revision FROM proposals").fetchone()
+        self.assertEqual(state, ("new", 2))
+
+    def test_forward_store_version_is_never_read_or_mutated(self) -> None:
+        with sqlite3.connect(self.path) as connection:
+            connection.execute("PRAGMA user_version = 4")
+        with self.assertRaisesRegex(ValueError, "unsupported store version"):
+            self.store.approve(self.proposal.fingerprint, 1, "now")
+        with self.assertRaisesRegex(ValueError, "unsupported store version"):
+            self.store.approved_revision(self.proposal.fingerprint)
+        self.assertEqual(self.counts(), (0, 0))
