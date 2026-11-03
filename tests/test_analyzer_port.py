@@ -86,3 +86,36 @@ class AnalyzerPortTests(unittest.TestCase):
         with self.assertRaisesRegex(SchemaError, "evidence"):
             run_analyzer(analyzer, self.store, "source-a", "evidence")
         self.assert_empty()
+
+    def test_direct_input_must_already_be_normalized(self) -> None:
+        with self.assertRaises(SchemaError):
+            AnalyzerInput(" source-a ", "alpha\n beta")
+
+    def test_rejected_proposal_reopens_with_one_event(self) -> None:
+        run_analyzer(FakeAnalyzer(candidate("source-a", "one")), self.store, "source-a", "one")
+        proposal = run_analyzer(
+            FakeAnalyzer(candidate("source-b", "two")), self.store, "source-b", "two"
+        )
+        rejected = proposal.transition(ProposalStatus.REJECTED)
+        self.store.save(
+            rejected,
+            StatusEvent(1, proposal.fingerprint, proposal.status, rejected.status, "2026-11-02"),
+        )
+
+        reopened = run_analyzer(
+            FakeAnalyzer(candidate("source-c", "three")),
+            self.store,
+            "source-c",
+            "three",
+            occurred_at="2026-11-03",
+        )
+        self.assertEqual(reopened.status, ProposalStatus.NEW)
+        with sqlite3.connect(self.store.path) as connection:
+            events = connection.execute(
+                "SELECT count(*) FROM events WHERE previous = 'rejected' AND current = 'new'"
+            ).fetchone()[0]
+        self.assertEqual(events, 1)
+
+
+if __name__ == "__main__":
+    unittest.main()
