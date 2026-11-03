@@ -53,7 +53,7 @@ class AnalyzerCandidateTests(unittest.TestCase):
         self.assertEqual(proposal.status, ProposalStatus.NEW)
         expected = analyzer_candidate_from_mapping(candidate()).revision()
         self.assertEqual(replace(proposal.revision, evidence=()), expected)
-        self.assertEqual(self.counts(), (2, 1, 1, 0))
+        self.assertEqual(self.counts(), (2, 1, 1, 1))
 
         changed = candidate("source-c")
         changed["title"] = "Updated review rule"
@@ -92,6 +92,7 @@ class AnalyzerCandidateTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(SchemaError):
                 self.store.ingest_analyzer_output(value)
             self.assertEqual(self.counts(), (0, 0, 0, 0))
+
 
 if __name__ == "__main__":
     unittest.main()

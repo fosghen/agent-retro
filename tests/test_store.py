@@ -2,6 +2,7 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from datetime import UTC, datetime
 from pathlib import Path
 
 from agent_retro.models import (
@@ -313,6 +314,38 @@ class ProposalStoreInitializationTests(unittest.TestCase):
             )
         self.assertEqual(counts, (1, 1))
 
+    def test_creation_event_failure_rolls_back_promotion_and_retries(self) -> None:
+        store = ProposalStore(self.path)
+        store.initialize()
+        first, second = observation("source-a"), observation("source-b")
+        store.aggregate_observation(first)
+        with sqlite3.connect(self.path) as connection:
+            connection.execute(
+                "CREATE TRIGGER fail_creation BEFORE INSERT ON events "
+                "WHEN NEW.previous = 'new' AND NEW.current = 'new' "
+                "BEGIN SELECT RAISE(ABORT, 'injected'); END"
+            )
+        with self.assertRaises(sqlite3.IntegrityError):
+            store.aggregate_observation(second)
+        with sqlite3.connect(self.path) as connection:
+            counts = tuple(
+                connection.execute(query).fetchone()[0]
+                for query in (
+                    "SELECT count(*) FROM occurrences",
+                    "SELECT count(*) FROM proposals",
+                    "SELECT count(*) FROM revisions",
+                    "SELECT count(*) FROM events",
+                )
+            )
+            connection.execute("DROP TRIGGER fail_creation")
+        self.assertEqual(counts, (1, 0, 0, 0))
+
+        store.aggregate_observation(second)
+        with sqlite3.connect(self.path) as connection:
+            occurred_at = connection.execute("SELECT occurred_at FROM events").fetchone()[0]
+        parsed = datetime.fromisoformat(occurred_at)
+        self.assertEqual(parsed.utcoffset(), UTC.utcoffset(parsed))
+
     def test_rejected_duplicate_stays_suppressed(self) -> None:
         store = ProposalStore(self.path)
         store.initialize()
@@ -336,7 +369,7 @@ class ProposalStoreInitializationTests(unittest.TestCase):
                     "SELECT count(*) FROM events",
                 )
             )
-        self.assertEqual(counts, (2, 1, 1))
+        self.assertEqual(counts, (2, 1, 2))
 
     def test_new_evidence_reopens_rejected_proposal_once(self) -> None:
         store = ProposalStore(self.path)
@@ -374,7 +407,7 @@ class ProposalStoreInitializationTests(unittest.TestCase):
                 "SELECT payload FROM revisions ORDER BY revision"
             ).fetchall()
         self.assertEqual(event, ("rejected", "new", "new-evidence"))
-        self.assertEqual(counts, (3, 2, 2))
+        self.assertEqual(counts, (3, 2, 3))
         evidence = [
             [item["source_hash"] for item in json.loads(row[0])["evidence"]] for row in payloads
         ]
@@ -422,7 +455,7 @@ class ProposalStoreInitializationTests(unittest.TestCase):
         self.assertEqual(store.get(rejected.fingerprint), rejected)
         self.assertEqual(store.occurrence_count(rejected.fingerprint), 2)
         with sqlite3.connect(self.path) as connection:
-            self.assertEqual(connection.execute("SELECT count(*) FROM events").fetchone()[0], 1)
+            self.assertEqual(connection.execute("SELECT count(*) FROM events").fetchone()[0], 2)
 
 
 if __name__ == "__main__":

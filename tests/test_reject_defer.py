@@ -39,7 +39,7 @@ class RejectDeferTests(unittest.TestCase):
         with self.assertRaises(SchemaError):
             self.store.reject(self.proposal.fingerprint, "Again", "again-at")
         self.assertEqual(self.store.aggregate_observation(observation("source-b")), rejected)
-        self.assertEqual(self.counts(), (1, 1))
+        self.assertEqual(self.counts(), (1, 2))
 
         reopened = self.store.aggregate_observation(observation("source-c"), occurred_at="new-at")
         self.assertEqual(reopened.status, ProposalStatus.NEW)
@@ -48,17 +48,17 @@ class RejectDeferTests(unittest.TestCase):
                 "SELECT decision, revision, occurred_at, reason, until_date FROM decisions"
             ).fetchone()
             event_times = connection.execute(
-                "SELECT occurred_at FROM events ORDER BY id"
+                "SELECT occurred_at FROM events WHERE previous != current ORDER BY id"
             ).fetchall()
         self.assertEqual(decision, ("rejected", 1, "rejected-at", "Not actionable", None))
         self.assertEqual(event_times, [("rejected-at",), ("new-at",)])
-        self.assertEqual(self.counts(), (1, 2))
+        self.assertEqual(self.counts(), (1, 3))
 
     def test_invalid_rejection_and_database_failure_are_atomic(self) -> None:
         for reason in ("", "x" * 1001):
             with self.subTest(reason=reason), self.assertRaises(SchemaError):
                 self.store.reject(self.proposal.fingerprint, reason, "now")
-        self.assertEqual(self.counts(), (0, 0))
+        self.assertEqual(self.counts(), (0, 1))
 
         with sqlite3.connect(self.path) as connection:
             connection.execute(
@@ -67,14 +67,14 @@ class RejectDeferTests(unittest.TestCase):
             )
         with self.assertRaises(sqlite3.IntegrityError):
             self.store.reject(self.proposal.fingerprint, "Valid", "now")
-        self.assertEqual(self.counts(), (0, 0))
+        self.assertEqual(self.counts(), (0, 1))
         self.assertEqual(self.store.get(self.proposal.fingerprint).status, ProposalStatus.NEW)
 
     def test_deferral_requires_iso_date_and_repeated_decision_is_atomic(self) -> None:
         for until_date in ("", "2026-02-30", "03-11-2026"):
             with self.subTest(until_date=until_date), self.assertRaises(SchemaError):
                 self.store.defer(self.proposal.fingerprint, until_date, "now")
-        self.assertEqual(self.counts(), (0, 0))
+        self.assertEqual(self.counts(), (0, 1))
 
         deferred = self.store.defer(self.proposal.fingerprint, "2026-12-01", "deferred-at")
         self.assertEqual(deferred.status, ProposalStatus.DEFERRED)
@@ -85,7 +85,7 @@ class RejectDeferTests(unittest.TestCase):
                 "SELECT decision, occurred_at, reason, until_date FROM decisions"
             ).fetchone()
         self.assertEqual(row, ("deferred", "deferred-at", None, "2026-12-01"))
-        self.assertEqual(self.counts(), (1, 1))
+        self.assertEqual(self.counts(), (1, 2))
 
     def test_cli_rejects_and_reports_invalid_deferral_without_traceback(self) -> None:
         result = main(

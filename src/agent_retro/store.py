@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from dataclasses import asdict, replace
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path  # noqa: TC003 -- public constructor accepts Path.
 
 from agent_retro.models import (
@@ -510,7 +510,18 @@ class ProposalStore:
                     json.dumps(asdict(revision), sort_keys=True),
                 ),
             )
-            if current is not None and current.status is ProposalStatus.REJECTED:
+            if current is None:
+                connection.execute(
+                    "INSERT INTO events (fingerprint, previous, current, occurred_at) "
+                    "VALUES (?, ?, ?, ?)",
+                    (
+                        proposal.fingerprint,
+                        ProposalStatus.NEW.value,
+                        ProposalStatus.NEW.value,
+                        occurred_at or datetime.now(UTC).isoformat(),
+                    ),
+                )
+            elif current.status is ProposalStatus.REJECTED:
                 connection.execute(
                     "INSERT INTO events (fingerprint, previous, current, occurred_at) "
                     "VALUES (?, ?, ?, ?)",
