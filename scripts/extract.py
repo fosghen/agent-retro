@@ -25,6 +25,7 @@ from agent_retro.transcript_io import (
     stream_raw_jsonl,
 )
 from agent_retro.transcript_normalize import (
+    json_object as _json_object,
     normalize_codex_content as _normalize_codex_content,
     normalize_codex_tool as _codex_tool_use,
 )
@@ -40,19 +41,6 @@ PRICE_PER_M = {
 }
 
 SCHEMA_VERSION = "0.1.0"
-
-
-def _json_object(value):
-    """Decode a JSON object, returning an empty object for invalid input."""
-    if isinstance(value, dict):
-        return value
-    if not isinstance(value, str):
-        return {}
-    try:
-        parsed = json.loads(value)
-    except json.JSONDecodeError:
-        return {}
-    return parsed if isinstance(parsed, dict) else {}
 
 
 def _is_injected_user_text(text):
