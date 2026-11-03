@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import sqlite3
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -40,6 +41,9 @@ def parser() -> argparse.ArgumentParser:
     list_parser.add_argument("--status", type=ProposalStatus, choices=list(ProposalStatus))
     show_parser = commands.add_parser("show", help="show one proposal revision")
     show_parser.add_argument("proposal_id")
+    approve_parser = commands.add_parser("approve", help="approve the current proposal revision")
+    approve_parser.add_argument("proposal_id")
+    approve_parser.add_argument("--revision", type=int, required=True)
     return result
 
 
@@ -93,7 +97,13 @@ def _show(store: ProposalStore, proposal_id: str) -> int:
     return 0
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def _approve(store: ProposalStore, proposal_id: str, revision: int) -> int:
+    approved = store.approve(proposal_id, revision, datetime.now(UTC).isoformat())
+    _write(f"Approved revision {approved.revision.number}: {proposal_id}")
+    return 0
+
+
+def main(argv: Sequence[str] | None = None) -> int:  # noqa: PLR0911
     """Run the command-line application."""
     arguments = parser().parse_args(argv)
     if arguments.command is None:
@@ -109,6 +119,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         if arguments.command == "list":
             return _list(store, arguments.status)
+        if arguments.command == "approve":
+            return _approve(store, arguments.proposal_id, arguments.revision)
         return _show(store, arguments.proposal_id)
     except (sqlite3.DatabaseError, ValueError):
         _write("Cannot read proposal store: invalid or unsupported data.", error=True)

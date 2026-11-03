@@ -16,12 +16,13 @@ from agent_retro.models import (
     ProposalObservation,
     ProposalRevision,
     ProposalStatus,
+    SchemaError,
     StatusEvent,
     analyzer_candidate_from_mapping,
     proposal_from_mapping,
 )
 
-STORE_VERSION = 2
+STORE_VERSION = 3
 PROMOTION_OCCURRENCES = 2
 
 
@@ -52,6 +53,9 @@ class ProposalStore:
                 version = 1
             if version == 1:
                 self._migrate_v2(connection)
+                version = 2
+            if version == STORE_VERSION - 1:
+                self._migrate_v3(connection)
 
     def _migrate_v1(self, connection: sqlite3.Connection) -> None:
         connection.execute(
@@ -77,6 +81,14 @@ class ProposalStore:
             "UNIQUE(fingerprint, source_hash))"
         )
         connection.execute("PRAGMA user_version = 2")
+
+    def _migrate_v3(self, connection: sqlite3.Connection) -> None:
+        connection.execute(
+            "CREATE TABLE decisions (id INTEGER PRIMARY KEY, fingerprint TEXT NOT NULL, "
+            "decision TEXT NOT NULL, revision INTEGER NOT NULL, occurred_at TEXT NOT NULL, "
+            "reason TEXT, until_date TEXT)"
+        )
+        connection.execute("PRAGMA user_version = 3")
 
     def save(self, proposal: Proposal, event: StatusEvent) -> None:
         """Atomically store one proposal revision and its append-only event."""
@@ -160,6 +172,54 @@ class ProposalStore:
             ).fetchone()
         return None if row is None else self._proposal(row)
 
+    def approved_revision(self, fingerprint: str) -> ProposalRevision | None:
+        """Return the immutable revision frozen by approval."""
+        with self._connect() as connection:
+            self._check_version(connection)
+            row = connection.execute(
+                "SELECT p.schema_version, p.fingerprint, p.status, r.payload "
+                "FROM decisions d JOIN proposals p ON p.fingerprint = d.fingerprint "
+                "JOIN revisions r ON r.fingerprint = d.fingerprint AND r.revision = d.revision "
+                "WHERE d.fingerprint = ? AND d.decision = 'approved' ORDER BY d.id LIMIT 1",
+                (fingerprint,),
+            ).fetchone()
+        return None if row is None else self._proposal(row).revision
+
+    def approve(self, fingerprint: str, revision: int, occurred_at: str) -> Proposal:
+        """Atomically approve and freeze the current reviewed revision."""
+        if not isinstance(occurred_at, str) or not occurred_at.strip():
+            raise SchemaError("approval timestamp is required")  # noqa: EM101, TRY003
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            self._check_version(connection)
+            row = connection.execute(
+                "SELECT p.schema_version, p.fingerprint, p.status, r.payload "
+                "FROM proposals p JOIN revisions r ON r.fingerprint = p.fingerprint "
+                "AND r.revision = p.current_revision WHERE p.fingerprint = ?",
+                (fingerprint,),
+            ).fetchone()
+            if row is None:
+                raise SchemaError("proposal not found")  # noqa: EM101, TRY003
+            current = self._proposal(row)
+            if current.revision.number != revision:
+                raise SchemaError("reviewed revision is stale")  # noqa: EM101, TRY003
+            approved = current.transition(ProposalStatus.APPROVED)
+            connection.execute(
+                "INSERT INTO decisions (fingerprint, decision, revision, occurred_at) "
+                "VALUES (?, 'approved', ?, ?)",
+                (fingerprint, revision, occurred_at),
+            )
+            connection.execute(
+                "UPDATE proposals SET status = ? WHERE fingerprint = ?",
+                (approved.status.value, fingerprint),
+            )
+            connection.execute(
+                "INSERT INTO events (fingerprint, previous, current, occurred_at) "
+                "VALUES (?, ?, ?, ?)",
+                (fingerprint, current.status.value, approved.status.value, occurred_at),
+            )
+        return approved
+
     def record_observation(self, observation: ProposalObservation) -> bool:
         """Persist one distinct source observation and report whether it was new."""
         with self._connect() as connection:
@@ -237,6 +297,7 @@ class ProposalStore:
                 return current
             if current is not None and current.status not in {
                 ProposalStatus.NEW,
+                ProposalStatus.APPROVED,
                 ProposalStatus.REJECTED,
             }:
                 return current
