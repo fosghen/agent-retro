@@ -10,12 +10,14 @@ from pathlib import Path  # noqa: TC003 -- public constructor accepts Path.
 from agent_retro.models import (
     MAX_PROPOSAL_EVIDENCE,
     SCHEMA_VERSION,
+    AnalyzerCandidate,
     EvidenceReference,
     Proposal,
     ProposalObservation,
     ProposalRevision,
     ProposalStatus,
     StatusEvent,
+    analyzer_candidate_from_mapping,
     proposal_from_mapping,
 )
 
@@ -206,7 +208,11 @@ class ProposalStore:
         return int(row[0])
 
     def aggregate_observation(
-        self, observation: ProposalObservation, *, occurred_at: str | None = None
+        self,
+        observation: ProposalObservation,
+        *,
+        occurred_at: str | None = None,
+        template: AnalyzerCandidate | None = None,
     ) -> Proposal | None:
         """Record evidence and promote recurring observations atomically."""
         with self._connect() as connection:
@@ -240,16 +246,20 @@ class ProposalStore:
             )
             if current is None:
                 intent, target, scope, _, _ = rows[0]
-                revision = ProposalRevision(
-                    1,
-                    " ".join(intent.split()),
-                    f"Observed in {len(rows)} distinct sources.",
-                    target,
-                    evidence,
-                    problem=intent,
-                    affected_workflow=target,
-                    proposed_artifact=target,
-                    scope=scope,
+                revision = (
+                    replace(template.revision(), evidence=evidence)
+                    if template is not None
+                    else ProposalRevision(
+                        1,
+                        " ".join(intent.split()),
+                        f"Observed in {len(rows)} distinct sources.",
+                        target,
+                        evidence,
+                        problem=intent,
+                        affected_workflow=target,
+                        proposed_artifact=target,
+                        scope=scope,
+                    )
                 )
                 proposal = Proposal(
                     SCHEMA_VERSION, observation.fingerprint, ProposalStatus.NEW, revision
@@ -259,11 +269,19 @@ class ProposalStore:
                     (proposal.fingerprint, proposal.schema_version, proposal.status.value, 1),
                 )
             else:
-                revision = replace(
-                    current.revision,
-                    number=current.revision.number + 1,
-                    rationale=f"Observed in {len(rows)} distinct sources.",
-                    evidence=evidence,
+                revision = (
+                    replace(
+                        template.revision(),
+                        number=current.revision.number + 1,
+                        evidence=evidence,
+                    )
+                    if template is not None
+                    else replace(
+                        current.revision,
+                        number=current.revision.number + 1,
+                        rationale=f"Observed in {len(rows)} distinct sources.",
+                        evidence=evidence,
+                    )
                 )
                 reopened = current.status is ProposalStatus.REJECTED
                 if reopened and not occurred_at:
@@ -298,3 +316,12 @@ class ProposalStore:
                     ),
                 )
         return proposal
+
+    def ingest_analyzer_output(
+        self, value: object, *, occurred_at: str | None = None
+    ) -> Proposal | None:
+        """Validate a candidate completely before starting durable ingestion."""
+        candidate = analyzer_candidate_from_mapping(value)
+        return self.aggregate_observation(
+            candidate.observation, occurred_at=occurred_at, template=candidate
+        )

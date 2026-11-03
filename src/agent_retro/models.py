@@ -11,6 +11,7 @@ SCHEMA_VERSION = 1
 MAX_EXCERPT_CHARS = 500
 MAX_PROPOSAL_EVIDENCE = 5
 MAX_SOURCE_HASH_CHARS = 128
+MAX_STRUCTURED_TEXT_CHARS = 1000
 
 
 class SchemaError(ValueError):
@@ -71,6 +72,39 @@ class ProposalObservation:
         )
         digest = hashlib.sha256(identity.encode(), usedforsecurity=False).hexdigest()
         return f"sha256:{digest}"
+
+
+@dataclass(frozen=True)
+class AnalyzerCandidate:
+    """Validated structured analyzer output awaiting durable ingestion."""
+
+    schema_version: int
+    observation: ProposalObservation
+    title: str
+    rationale: str
+    problem: str
+    affected_workflow: str
+    proposed_artifact: str
+    expected_benefit: str
+    risks: str
+    validation: str
+
+    def revision(self) -> ProposalRevision:
+        """Build the initial reviewable revision without occurrence evidence."""
+        return ProposalRevision(
+            1,
+            self.title,
+            self.rationale,
+            self.observation.target,
+            (),
+            self.problem,
+            self.affected_workflow,
+            self.proposed_artifact,
+            self.expected_benefit,
+            self.risks,
+            self.observation.scope,
+            self.validation,
+        )
 
 
 @dataclass(frozen=True)
@@ -149,6 +183,13 @@ def _text(value: object, field: str) -> str:
     return value
 
 
+def _bounded_text(value: object, field: str) -> str:
+    text = _text(value, field)
+    if len(text) > MAX_STRUCTURED_TEXT_CHARS:
+        raise SchemaError(f"{field} exceeds {MAX_STRUCTURED_TEXT_CHARS} characters")  # noqa: EM102, TRY003
+    return text
+
+
 def _integer(value: object, field: str) -> int:
     if not isinstance(value, int) or isinstance(value, bool) or value < 1:
         raise SchemaError(f"{field} must be a positive integer")  # noqa: EM102, TRY003
@@ -196,3 +237,34 @@ def proposal_from_mapping(value: object) -> Proposal:
         ),
     )
     return Proposal(version, _text(root.get("fingerprint"), "fingerprint"), status, revision)
+
+
+def analyzer_candidate_from_mapping(value: object) -> AnalyzerCandidate:
+    """Validate untrusted structured analyzer output before persistence."""
+    root = _mapping(value, "candidate")
+    version = _integer(root.get("schema_version"), "schema_version")
+    if version != SCHEMA_VERSION:
+        raise SchemaError(f"unsupported schema version: {version}")  # noqa: EM102, TRY003
+    evidence = _mapping(root.get("evidence"), "evidence")
+    observation = ProposalObservation(
+        _bounded_text(root.get("intent"), "intent"),
+        _bounded_text(root.get("target"), "target"),
+        _bounded_text(root.get("scope"), "scope"),
+        EvidenceReference(
+            _text(evidence.get("source_hash"), "source_hash"),
+            _text(evidence.get("excerpt"), "excerpt"),
+        ),
+    )
+    fields = (
+        "title",
+        "rationale",
+        "problem",
+        "affected_workflow",
+        "proposed_artifact",
+        "expected_benefit",
+        "risks",
+        "validation",
+    )
+    return AnalyzerCandidate(
+        version, observation, *(_bounded_text(root.get(name), name) for name in fields)
+    )
