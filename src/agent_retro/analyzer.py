@@ -79,3 +79,18 @@ def persist_candidate(
 ) -> Proposal | None:
     """Persist one already validated candidate through recurrence aggregation."""
     return store.ingest_candidate(candidate, occurred_at=occurred_at)
+
+
+def run_analyzer(
+    analyzer: Analyzer,
+    store: ProposalStore,
+    source_hash: str,
+    excerpt: str,
+    *,
+    occurred_at: str | None = None,
+) -> Proposal | None:
+    """Run the bounded invoke, validate, and persist pipeline."""
+    source = normalize_input(source_hash, excerpt)
+    output = invoke_analyzer(analyzer, source)
+    candidate = validate_output(output, source)
+    return persist_candidate(store, candidate, occurred_at=occurred_at)
