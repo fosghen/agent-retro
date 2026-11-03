@@ -41,6 +41,56 @@ def parser() -> argparse.ArgumentParser:
     return result
 
 
+def _write(text: str, *, error: bool = False) -> None:
+    stream = sys.stderr if error else sys.stdout
+    stream.write(f"{text}\n")
+
+
+def _print_proposal(proposal: Proposal) -> None:
+    """Print the bounded fields available in the current proposal schema."""
+    fields = (
+        ("ID", proposal.fingerprint),
+        ("Status", proposal.status.value),
+        ("Revision", proposal.revision.number),
+        ("Title", proposal.revision.title),
+        ("Rationale", proposal.revision.rationale),
+        ("Target", proposal.revision.target),
+        ("Problem", proposal.revision.problem),
+        ("Affected workflow", proposal.revision.affected_workflow),
+        ("Proposed artifact", proposal.revision.proposed_artifact),
+        ("Expected benefit", proposal.revision.expected_benefit),
+        ("Risks", proposal.revision.risks),
+        ("Scope", proposal.revision.scope),
+        ("Validation", proposal.revision.validation),
+    )
+    for label, value in fields:
+        _write(f"{label}: {value}")
+    _write("Evidence:")
+    for evidence in proposal.revision.evidence[:MAX_EVIDENCE_ITEMS]:
+        source_hash = evidence.source_hash[:MAX_SOURCE_HASH_CHARS]
+        _write(f"- {source_hash}: {evidence.excerpt[:MAX_EVIDENCE_CHARS]}")
+    if len(proposal.revision.evidence) > MAX_EVIDENCE_ITEMS:
+        _write("- Additional evidence omitted.")
+
+
+def _list(store: ProposalStore, status: ProposalStatus | None) -> int:
+    proposals = store.list_proposals(status)
+    if not proposals:
+        _write("No proposals.")
+    for proposal in proposals:
+        _write(f"{proposal.fingerprint}\t{proposal.status.value}\t{proposal.revision.title}")
+    return 0
+
+
+def _show(store: ProposalStore, proposal_id: str) -> int:
+    proposal = store.get(proposal_id)
+    if proposal is None:
+        _write(f"Proposal not found: {proposal_id}", error=True)
+        return 1
+    _print_proposal(proposal)
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command-line application."""
     arguments = parser().parse_args(argv)
