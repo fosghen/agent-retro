@@ -262,17 +262,17 @@ class ProposalStoreInitializationTests(unittest.TestCase):
         store.initialize()
         store.aggregate_observation(observation("source-a"))
         promoted = store.aggregate_observation(observation("source-b"))
-        rejected = promoted.transition(ProposalStatus.REJECTED)
+        approved = promoted.transition(ProposalStatus.APPROVED)
         store.save(
-            rejected,
+            approved,
             StatusEvent(
-                1, rejected.fingerprint, ProposalStatus.NEW, ProposalStatus.REJECTED, "now"
+                1, approved.fingerprint, ProposalStatus.NEW, ProposalStatus.APPROVED, "now"
             ),
         )
 
         result = store.aggregate_observation(observation("source-c"))
-        self.assertEqual(result, rejected)
-        self.assertEqual(store.occurrence_count(rejected.fingerprint), 3)
+        self.assertEqual(result, approved)
+        self.assertEqual(store.occurrence_count(approved.fingerprint), 3)
         with sqlite3.connect(self.path) as connection:
             self.assertEqual(connection.execute("SELECT count(*) FROM revisions").fetchone()[0], 1)
 
@@ -300,6 +300,117 @@ class ProposalStoreInitializationTests(unittest.TestCase):
                 connection.execute("SELECT count(*) FROM revisions").fetchone()[0],
             )
         self.assertEqual(counts, (1, 1))
+
+    def test_rejected_duplicate_stays_suppressed(self) -> None:
+        store = ProposalStore(self.path)
+        store.initialize()
+        store.aggregate_observation(observation("source-a"))
+        promoted = store.aggregate_observation(observation("source-b"))
+        rejected = promoted.transition(ProposalStatus.REJECTED)
+        store.save(
+            rejected,
+            StatusEvent(
+                1, rejected.fingerprint, ProposalStatus.NEW, ProposalStatus.REJECTED, "rejected"
+            ),
+        )
+
+        self.assertEqual(store.aggregate_observation(observation("source-b")), rejected)
+        with sqlite3.connect(self.path) as connection:
+            counts = tuple(
+                connection.execute(query).fetchone()[0]
+                for query in (
+                    "SELECT count(*) FROM occurrences",
+                    "SELECT count(*) FROM revisions",
+                    "SELECT count(*) FROM events",
+                )
+            )
+        self.assertEqual(counts, (2, 1, 1))
+
+    def test_new_evidence_reopens_rejected_proposal_once(self) -> None:
+        store = ProposalStore(self.path)
+        store.initialize()
+        store.aggregate_observation(observation("source-a"))
+        promoted = store.aggregate_observation(observation("source-b"))
+        rejected = promoted.transition(ProposalStatus.REJECTED)
+        store.save(
+            rejected,
+            StatusEvent(
+                1, rejected.fingerprint, ProposalStatus.NEW, ProposalStatus.REJECTED, "rejected"
+            ),
+        )
+
+        reopened = store.aggregate_observation(observation("source-c"), occurred_at="new-evidence")
+        self.assertEqual((reopened.status, reopened.revision.number), (ProposalStatus.NEW, 2))
+        self.assertEqual(
+            [item.source_hash for item in reopened.revision.evidence],
+            ["source-a", "source-b", "source-c"],
+        )
+        self.assertEqual(store.aggregate_observation(observation("source-c")), reopened)
+        with sqlite3.connect(self.path) as connection:
+            event = connection.execute(
+                "SELECT previous, current, occurred_at FROM events ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+            counts = tuple(
+                connection.execute(query).fetchone()[0]
+                for query in (
+                    "SELECT count(*) FROM occurrences",
+                    "SELECT count(*) FROM revisions",
+                    "SELECT count(*) FROM events",
+                )
+            )
+            payloads = connection.execute(
+                "SELECT payload FROM revisions ORDER BY revision"
+            ).fetchall()
+        self.assertEqual(event, ("rejected", "new", "new-evidence"))
+        self.assertEqual(counts, (3, 2, 2))
+        evidence = [
+            [item["source_hash"] for item in json.loads(row[0])["evidence"]] for row in payloads
+        ]
+        self.assertEqual(evidence, [["source-a", "source-b"], ["source-a", "source-b", "source-c"]])
+
+    def test_changed_scope_does_not_reopen_rejected_proposal(self) -> None:
+        store = ProposalStore(self.path)
+        store.initialize()
+        store.aggregate_observation(observation("source-a"))
+        promoted = store.aggregate_observation(observation("source-b"))
+        rejected = promoted.transition(ProposalStatus.REJECTED)
+        store.save(
+            rejected,
+            StatusEvent(
+                1, rejected.fingerprint, ProposalStatus.NEW, ProposalStatus.REJECTED, "rejected"
+            ),
+        )
+
+        store.aggregate_observation(observation("other-a", scope="two files"))
+        other = store.aggregate_observation(observation("other-b", scope="two files"))
+        self.assertEqual(store.get(rejected.fingerprint), rejected)
+        self.assertEqual((other.status, other.revision.number), (ProposalStatus.NEW, 1))
+        self.assertNotEqual(other.fingerprint, rejected.fingerprint)
+
+    def test_reopen_failure_rolls_back_new_evidence(self) -> None:
+        store = ProposalStore(self.path)
+        store.initialize()
+        store.aggregate_observation(observation("source-a"))
+        promoted = store.aggregate_observation(observation("source-b"))
+        rejected = promoted.transition(ProposalStatus.REJECTED)
+        store.save(
+            rejected,
+            StatusEvent(
+                1, rejected.fingerprint, ProposalStatus.NEW, ProposalStatus.REJECTED, "rejected"
+            ),
+        )
+        with sqlite3.connect(self.path) as connection:
+            connection.execute(
+                "CREATE TRIGGER fail_revision BEFORE INSERT ON revisions "
+                "BEGIN SELECT RAISE(ABORT, 'injected'); END"
+            )
+
+        with self.assertRaises(sqlite3.IntegrityError):
+            store.aggregate_observation(observation("source-c"), occurred_at="new-evidence")
+        self.assertEqual(store.get(rejected.fingerprint), rejected)
+        self.assertEqual(store.occurrence_count(rejected.fingerprint), 2)
+        with sqlite3.connect(self.path) as connection:
+            self.assertEqual(connection.execute("SELECT count(*) FROM events").fetchone()[0], 1)
 
 
 if __name__ == "__main__":
