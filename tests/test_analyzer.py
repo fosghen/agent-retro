@@ -69,3 +69,29 @@ class AnalyzerCandidateTests(unittest.TestCase):
 
         with self.assertRaisesRegex(SchemaError, "validation"):
             analyzer_candidate_from_mapping(value)
+
+    def test_invalid_candidates_never_mutate_store(self) -> None:
+        cases = []
+        missing = candidate()
+        missing.pop("scope")
+        cases.append(missing)
+        forward = candidate()
+        forward["schema_version"] = 2
+        cases.append(forward)
+        unbounded = candidate()
+        unbounded["evidence"] = {"source_hash": "source", "excerpt": "x" * 501}
+        cases.append(unbounded)
+        malformed = candidate()
+        malformed["evidence"] = "not an object"
+        cases.append(malformed)
+        oversized = candidate()
+        oversized["title"] = "x" * 1001
+        cases.append(oversized)
+
+        for value in cases:
+            with self.subTest(value=value), self.assertRaises(SchemaError):
+                self.store.ingest_analyzer_output(value)
+            self.assertEqual(self.counts(), (0, 0, 0, 0))
+
+if __name__ == "__main__":
+    unittest.main()

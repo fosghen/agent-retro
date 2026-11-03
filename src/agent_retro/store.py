@@ -316,3 +316,12 @@ class ProposalStore:
                     ),
                 )
         return proposal
+
+    def ingest_analyzer_output(
+        self, value: object, *, occurred_at: str | None = None
+    ) -> Proposal | None:
+        """Validate a candidate completely before starting durable ingestion."""
+        candidate = analyzer_candidate_from_mapping(value)
+        return self.aggregate_observation(
+            candidate.observation, occurred_at=occurred_at, template=candidate
+        )
