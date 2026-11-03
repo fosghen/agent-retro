@@ -204,3 +204,30 @@ class ProposalStore:
                 "SELECT count(*) FROM occurrences WHERE fingerprint = ?", (fingerprint,)
             ).fetchone()
         return int(row[0])
+
+    def aggregate_observation(self, observation: ProposalObservation) -> Proposal | None:
+        """Record evidence and promote recurring observations atomically."""
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            self._check_version(connection)
+            inserted = self._insert_observation(connection, observation)
+            rows = connection.execute(
+                "SELECT intent, target, scope, source_hash, excerpt FROM occurrences "
+                "WHERE fingerprint = ? ORDER BY id",
+                (observation.fingerprint,),
+            ).fetchall()
+            if len(rows) < PROMOTION_OCCURRENCES:
+                return None
+            current_row = connection.execute(
+                "SELECT p.schema_version, p.fingerprint, p.status, r.payload "
+                "FROM proposals p JOIN revisions r ON r.fingerprint = p.fingerprint "
+                "AND r.revision = p.current_revision WHERE p.fingerprint = ?",
+                (observation.fingerprint,),
+            ).fetchone()
+            current = None if current_row is None else self._proposal(current_row)
+            if current is not None and (not inserted or current.status is not ProposalStatus.NEW):
+                return current
+            evidence = tuple(
+                EvidenceReference(source_hash, excerpt)
+                for _, _, _, source_hash, excerpt in rows[-MAX_PROPOSAL_EVIDENCE:]
+            )

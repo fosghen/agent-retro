@@ -1,3 +1,4 @@
+import json
 import sqlite3
 import tempfile
 import unittest
@@ -199,6 +200,26 @@ class ProposalStoreInitializationTests(unittest.TestCase):
             count = connection.execute("SELECT count(*) FROM occurrences").fetchone()[0]
         self.assertEqual(count, 0)
 
+    def test_second_observation_promotes_once_and_third_revises(self) -> None:
+        store = ProposalStore(self.path)
+        store.initialize()
+        first, second, third = (observation(f"source-{value}") for value in "abc")
+
+        self.assertIsNone(store.aggregate_observation(first))
+        self.assertIsNone(store.aggregate_observation(first))
+        promoted = store.aggregate_observation(second)
+        self.assertEqual(promoted.status, ProposalStatus.NEW)
+        self.assertEqual(promoted.revision.number, 1)
+        self.assertEqual(store.aggregate_observation(second), promoted)
+        revised = store.aggregate_observation(third)
+        self.assertEqual(revised.revision.number, 2)
+        self.assertEqual(
+            [item.source_hash for item in revised.revision.evidence],
+            ["source-a", "source-b", "source-c"],
+        )
+        with sqlite3.connect(self.path) as connection:
+            self.assertEqual(connection.execute("SELECT count(*) FROM proposals").fetchone()[0], 1)
+            self.assertEqual(connection.execute("SELECT count(*) FROM revisions").fetchone()[0], 2)
 
 if __name__ == "__main__":
     unittest.main()
