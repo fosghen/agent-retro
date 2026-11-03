@@ -30,7 +30,8 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: python scripts/check_change_limits.py --range "$BASE_SHA" "$HEAD_SHA"
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: python scripts/check_change_limits.py --branch "$HEAD_BRANCH" --range "$BASE_SHA" "$HEAD_SHA"
       - name: Run tests
         run: |
           uv sync --locked --all-groups

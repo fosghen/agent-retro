@@ -74,8 +74,9 @@ def main() -> int:
     """Check either the staged commit or a base-to-head range."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--range", nargs=2, metavar=("BASE", "HEAD"))
+    parser.add_argument("--branch")
     args = parser.parse_args()
-    branch = git("branch", "--show-current")
+    branch = args.branch or git("branch", "--show-current")
     if args.range:
         hashes = git("rev-list", "--reverse", f"{args.range[0]}..{args.range[1]}").splitlines()
         commits = {item: git("show", "--format=", "--numstat", item) for item in hashes}
