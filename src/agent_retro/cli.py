@@ -11,13 +11,12 @@ from typing import TYPE_CHECKING
 from agent_retro import __version__
 from agent_retro.models import (
     MAX_EXCERPT_CHARS,
+    MAX_PROPOSAL_EVIDENCE,
     MAX_SOURCE_HASH_CHARS,
     Proposal,
     ProposalStatus,
 )
 from agent_retro.store import ProposalStore
-
-MAX_EVIDENCE_ITEMS = 5
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -69,10 +68,10 @@ def _print_proposal(proposal: Proposal) -> None:
     for label, value in fields:
         _write(f"{label}: {value}")
     _write("Evidence:")
-    for evidence in proposal.revision.evidence[:MAX_EVIDENCE_ITEMS]:
+    for evidence in proposal.revision.evidence[:MAX_PROPOSAL_EVIDENCE]:
         source_hash = evidence.source_hash[:MAX_SOURCE_HASH_CHARS]
         _write(f"- {source_hash}: {evidence.excerpt[:MAX_EXCERPT_CHARS]}")
-    if len(proposal.revision.evidence) > MAX_EVIDENCE_ITEMS:
+    if len(proposal.revision.evidence) > MAX_PROPOSAL_EVIDENCE:
         _write("- Additional evidence omitted.")
 
 

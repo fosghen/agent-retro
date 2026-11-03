@@ -4,19 +4,23 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path  # noqa: TC003 -- public constructor accepts Path.
 
 from agent_retro.models import (
+    MAX_PROPOSAL_EVIDENCE,
+    SCHEMA_VERSION,
     EvidenceReference,
     Proposal,
     ProposalObservation,
+    ProposalRevision,
     ProposalStatus,
     StatusEvent,
     proposal_from_mapping,
 )
 
 STORE_VERSION = 2
+PROMOTION_OCCURRENCES = 2
 
 
 class ProposalStore:
@@ -158,19 +162,24 @@ class ProposalStore:
         """Persist one distinct source observation and report whether it was new."""
         with self._connect() as connection:
             self._check_version(connection)
-            cursor = connection.execute(
-                "INSERT OR IGNORE INTO occurrences "
-                "(fingerprint, intent, target, scope, source_hash, excerpt) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (
-                    observation.fingerprint,
-                    observation.intent,
-                    observation.target,
-                    observation.scope,
-                    observation.evidence.source_hash,
-                    observation.evidence.excerpt,
-                ),
-            )
+            return self._insert_observation(connection, observation)
+
+    @staticmethod
+    def _insert_observation(
+        connection: sqlite3.Connection, observation: ProposalObservation
+    ) -> bool:
+        cursor = connection.execute(
+            "INSERT OR IGNORE INTO occurrences "
+            "(fingerprint, intent, target, scope, source_hash, excerpt) VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                observation.fingerprint,
+                observation.intent,
+                observation.target,
+                observation.scope,
+                observation.evidence.source_hash,
+                observation.evidence.excerpt,
+            ),
+        )
         return cursor.rowcount == 1
 
     def list_observations(self, fingerprint: str) -> list[ProposalObservation]:
