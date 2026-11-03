@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import argparse
+import re
 import shutil
+
 # Only the resolved Git executable is invoked; arguments are not shell-evaluated.
 import subprocess  # nosec B404
 import sys
 
-MAX_LINES = 50
+MAX_COMMIT_LINES = 100
+MAX_PR_LINES = 250
 MAX_COMMITS = 5
 GENERATED_EXCLUSIONS = frozenset({"uv.lock"})
+ISSUE_BRANCH = re.compile(r"(?:^|/)issue-[1-9][0-9]*(?:-|$)")
 
 
 class ChangeLimitError(ValueError):
@@ -36,14 +40,22 @@ def check(branch: str, commits: dict[str, str]) -> None:
     if branch in {"main", "master"}:
         message = f"commits on {branch!r} are forbidden"
         raise ChangeLimitError(message)
+    if not ISSUE_BRANCH.search(branch):
+        message = "development branch must reference an issue as issue-N"
+        raise ChangeLimitError(message)
     if len(commits) > MAX_COMMITS:
         message = f"PR has {len(commits)} commits; maximum is {MAX_COMMITS}"
         raise ChangeLimitError(message)
+    total_lines = 0
     for commit, numstat in commits.items():
         lines = count_lines(numstat)
-        if lines > MAX_LINES:
-            message = f"commit {commit} has {lines} changed lines; maximum is 50"
+        total_lines += lines
+        if lines > MAX_COMMIT_LINES:
+            message = f"commit {commit} has {lines} changed lines; maximum is {MAX_COMMIT_LINES}"
             raise ChangeLimitError(message)
+    if total_lines > MAX_PR_LINES:
+        message = f"PR has {total_lines} changed lines; maximum is {MAX_PR_LINES}"
+        raise ChangeLimitError(message)
 
 
 def git(*args: str) -> str:
@@ -62,8 +74,9 @@ def main() -> int:
     """Check either the staged commit or a base-to-head range."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--range", nargs=2, metavar=("BASE", "HEAD"))
+    parser.add_argument("--branch")
     args = parser.parse_args()
-    branch = git("branch", "--show-current")
+    branch = args.branch or git("branch", "--show-current")
     if args.range:
         hashes = git("rev-list", "--reverse", f"{args.range[0]}..{args.range[1]}").splitlines()
         commits = {item: git("show", "--format=", "--numstat", item) for item in hashes}
