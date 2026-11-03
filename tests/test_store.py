@@ -43,11 +43,14 @@ class ProposalStoreInitializationTests(unittest.TestCase):
         store.initialize()
 
         with sqlite3.connect(self.path) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 2)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 3)
             tables = connection.execute(
                 "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name"
             ).fetchall()
-        self.assertEqual(tables, [("events",), ("occurrences",), ("proposals",), ("revisions",)])
+        self.assertEqual(
+            tables,
+            [("decisions",), ("events",), ("occurrences",), ("proposals",), ("revisions",)],
+        )
 
     def test_corrupt_database_is_not_replaced(self) -> None:
         self.path.parent.mkdir()
@@ -138,7 +141,7 @@ class ProposalStoreInitializationTests(unittest.TestCase):
             store.list_proposals()
 
         with sqlite3.connect(self.path) as connection:
-            connection.execute("PRAGMA user_version = 3")
+            connection.execute("PRAGMA user_version = 4")
         with self.assertRaisesRegex(ValueError, "unsupported store version"):
             store.get("fingerprint")
 
@@ -193,7 +196,7 @@ class ProposalStoreInitializationTests(unittest.TestCase):
         store = ProposalStore(self.path)
         store.initialize()
         with sqlite3.connect(self.path) as connection:
-            connection.execute("PRAGMA user_version = 3")
+            connection.execute("PRAGMA user_version = 4")
         with self.assertRaisesRegex(ValueError, "unsupported store version"):
             store.record_observation(observation("source-a"))
         with sqlite3.connect(self.path) as connection:
@@ -257,7 +260,7 @@ class ProposalStoreInitializationTests(unittest.TestCase):
         promoted = store.aggregate_observation(second)
         self.assertEqual(promoted.revision.number, 1)
 
-    def test_aggregation_does_not_revise_non_new_proposal(self) -> None:
+    def test_aggregation_revises_approved_proposal_without_changing_status(self) -> None:
         store = ProposalStore(self.path)
         store.initialize()
         store.aggregate_observation(observation("source-a"))

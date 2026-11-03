@@ -21,7 +21,7 @@ from agent_retro.models import (
     proposal_from_mapping,
 )
 
-STORE_VERSION = 2
+STORE_VERSION = 3
 PROMOTION_OCCURRENCES = 2
 
 
@@ -52,6 +52,9 @@ class ProposalStore:
                 version = 1
             if version == 1:
                 self._migrate_v2(connection)
+                version = 2
+            if version == STORE_VERSION - 1:
+                self._migrate_v3(connection)
 
     def _migrate_v1(self, connection: sqlite3.Connection) -> None:
         connection.execute(
@@ -77,6 +80,14 @@ class ProposalStore:
             "UNIQUE(fingerprint, source_hash))"
         )
         connection.execute("PRAGMA user_version = 2")
+
+    def _migrate_v3(self, connection: sqlite3.Connection) -> None:
+        connection.execute(
+            "CREATE TABLE decisions (id INTEGER PRIMARY KEY, fingerprint TEXT NOT NULL, "
+            "decision TEXT NOT NULL, revision INTEGER NOT NULL, occurred_at TEXT NOT NULL, "
+            "reason TEXT, until_date TEXT)"
+        )
+        connection.execute("PRAGMA user_version = 3")
 
     def save(self, proposal: Proposal, event: StatusEvent) -> None:
         """Atomically store one proposal revision and its append-only event."""
