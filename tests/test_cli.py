@@ -54,6 +54,34 @@ class CliTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, 0)
         self.assertIn("Local-first retrospectives", output.getvalue())
 
+    def test_list_filters_and_summarizes_proposals(self) -> None:
+        self.save_proposal()
+        output = io.StringIO()
+        with redirect_stdout(output):
+            result = main(["--store", str(self.store_path), "list", "--status", "new"])
+        self.assertEqual(result, 0)
+        self.assertIn("workflow:retro:scope\tnew\tBound evidence", output.getvalue())
+
+    def test_show_presents_reviewable_fields(self) -> None:
+        self.save_proposal()
+        output = io.StringIO()
+        with redirect_stdout(output):
+            result = main(["--store", str(self.store_path), "show", "workflow:retro:scope"])
+        self.assertEqual(result, 0)
+        for expected in (
+            "Problem: Repeated failures",
+            "Affected workflow: Retrospectives",
+            "Proposed artifact: SKILL.md edit",
+            "Expected benefit: Fewer failures",
+            "Risks: False positives",
+            "Scope: One skill",
+            "Validation: Run evaluations",
+        ):
+            self.assertIn(expected, output.getvalue())
+        self.assertIn("Additional evidence omitted", output.getvalue())
+        self.assertNotIn("s" * 129, output.getvalue())
+        self.assertNotIn("x" * 501, output.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()
