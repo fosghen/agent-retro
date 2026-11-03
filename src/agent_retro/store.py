@@ -237,24 +237,32 @@ class ProposalStore:
             if row is None:
                 raise SchemaError("proposal not found")  # noqa: EM101, TRY003
             current = self._proposal(row)
-            if current.revision.number != revision:
+            if revision is not None and current.revision.number != revision:
                 raise SchemaError("reviewed revision is stale")  # noqa: EM101, TRY003
-            approved = current.transition(ProposalStatus.APPROVED)
+            decided = current.transition(target)
             connection.execute(
-                "INSERT INTO decisions (fingerprint, decision, revision, occurred_at) "
-                "VALUES (?, 'approved', ?, ?)",
-                (fingerprint, revision, occurred_at),
+                "INSERT INTO decisions "
+                "(fingerprint, decision, revision, occurred_at, reason, until_date) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    fingerprint,
+                    target.value,
+                    current.revision.number,
+                    occurred_at,
+                    reason,
+                    until_date,
+                ),
             )
             connection.execute(
                 "UPDATE proposals SET status = ? WHERE fingerprint = ?",
-                (approved.status.value, fingerprint),
+                (decided.status.value, fingerprint),
             )
             connection.execute(
                 "INSERT INTO events (fingerprint, previous, current, occurred_at) "
                 "VALUES (?, ?, ?, ?)",
-                (fingerprint, current.status.value, approved.status.value, occurred_at),
+                (fingerprint, current.status.value, decided.status.value, occurred_at),
             )
-        return approved
+        return decided
 
     def record_observation(self, observation: ProposalObservation) -> bool:
         """Persist one distinct source observation and report whether it was new."""
