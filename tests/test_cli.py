@@ -82,6 +82,40 @@ class CliTests(unittest.TestCase):
         self.assertNotIn("s" * 129, output.getvalue())
         self.assertNotIn("x" * 501, output.getvalue())
 
+    def test_empty_and_missing_state_are_explicit(self) -> None:
+        ProposalStore(self.store_path).initialize()
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(main(["--store", str(self.store_path), "list"]), 0)
+        self.assertEqual(output.getvalue().strip(), "No proposals.")
+
+        error = io.StringIO()
+        with redirect_stderr(error):
+            result = main(["--store", str(self.store_path), "show", "missing"])
+        self.assertEqual(result, 1)
+        self.assertIn("Proposal not found: missing", error.getvalue())
+
+    def test_corrupt_store_reports_bounded_error(self) -> None:
+        self.store_path.write_text("not sqlite", encoding="utf-8")
+        error = io.StringIO()
+        with redirect_stderr(error):
+            result = main(["--store", str(self.store_path), "list"])
+
+        self.assertEqual(result, 1)
+        self.assertIn("Cannot read proposal store", error.getvalue())
+
+    def test_forward_store_version_reports_bounded_error(self) -> None:
+        ProposalStore(self.store_path).initialize()
+        with sqlite3.connect(self.store_path) as connection:
+            connection.execute("PRAGMA user_version = 2")
+        error = io.StringIO()
+        with redirect_stderr(error):
+            result = main(["--store", str(self.store_path), "list"])
+        self.assertEqual(result, 1)
+        self.assertEqual(
+            error.getvalue().strip(), "Cannot read proposal store: invalid or unsupported data."
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
