@@ -27,7 +27,9 @@ from agent_retro.transcript_io import (
 from agent_retro.transcript_normalize import (
     json_object as _json_object,
     normalize_codex_content as _normalize_codex_content,
+    normalize_codex_record,
     normalize_codex_tool as _codex_tool_use,
+    stream_normalized_jsonl as stream_jsonl,
 )
 
 # Approximate pricing per million tokens (Claude Opus 4.6)
@@ -53,32 +55,10 @@ def _is_injected_user_text(text):
 
 def _normalize_codex_record(record):
     """Translate a Codex rollout record into the shared record shape."""
+    if record.get("type") in ("session_meta", "token_usage_record"):
+        return normalize_codex_record(record)
     payload = record.get("payload") or {}
     timestamp = record.get("timestamp")
-    if record.get("type") == "session_meta":
-        return {
-            "sessionId": payload.get("session_id") or payload.get("id"),
-            "cwd": payload.get("cwd"),
-            "version": payload.get("cli_version"),
-            "timestamp": timestamp or payload.get("timestamp"),
-        }
-    if record.get("type") == "token_usage_record":
-        usage = payload.get("usage") or {}
-        cached = usage.get("cached_input_tokens", 0) or 0
-        total_input = usage.get("input_tokens", 0) or 0
-        return {
-            "timestamp": timestamp,
-            "message": {
-                "role": "assistant",
-                "content": [],
-                "usage": {
-                    "input_tokens": max(0, total_input - cached),
-                    "output_tokens": usage.get("output_tokens", 0) or 0,
-                    "cache_creation_input_tokens": 0,
-                    "cache_read_input_tokens": cached,
-                },
-            },
-        }
     if record.get("type") != "response_item":
         return {"timestamp": timestamp}
     if payload.get("type") == "message":
@@ -107,13 +87,6 @@ def _normalize_codex_record(record):
             },
         }
     return {"timestamp": timestamp}
-
-
-def stream_jsonl(path):
-    """Yield records in the extractor's common shape."""
-    transcript_format = detect_transcript_format(path)
-    for record in stream_raw_jsonl(path):
-        yield _normalize_codex_record(record) if transcript_format == "codex" else record
 
 
 def extract_json_field(text, key):
