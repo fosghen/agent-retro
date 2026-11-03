@@ -7,7 +7,7 @@ import sqlite3
 from dataclasses import asdict
 from pathlib import Path  # noqa: TC003 -- public constructor accepts Path.
 
-from agent_retro.models import Proposal, StatusEvent  # noqa: TC001 -- public API types.
+from agent_retro.models import Proposal, ProposalStatus, StatusEvent, proposal_from_mapping
 
 STORE_VERSION = 1
 
@@ -86,3 +86,51 @@ class ProposalStore:
                     event.occurred_at,
                 ),
             )
+
+    @staticmethod
+    def _proposal(row: tuple[object, ...]) -> Proposal:
+        schema_version, fingerprint, status, payload = row
+        revision = json.loads(str(payload))
+        return proposal_from_mapping(
+            {
+                "schema_version": schema_version,
+                "fingerprint": fingerprint,
+                "status": status,
+                "revision": revision,
+            }
+        )
+
+    @staticmethod
+    def _check_version(connection: sqlite3.Connection) -> None:
+        version = connection.execute("PRAGMA user_version").fetchone()[0]
+        if version > STORE_VERSION:
+            raise ValueError(f"unsupported store version: {version}")  # noqa: EM102, TRY003
+
+    def list_proposals(self, status: ProposalStatus | None = None) -> list[Proposal]:
+        """Return current proposals in stable fingerprint order."""
+        query = (
+            "SELECT p.schema_version, p.fingerprint, p.status, r.payload "
+            "FROM proposals p LEFT JOIN revisions r ON r.fingerprint = p.fingerprint "
+            "AND r.revision = p.current_revision"
+        )
+        parameters: tuple[str, ...] = ()
+        if status is not None:
+            query += " WHERE p.status = ?"
+            parameters = (status.value,)
+        query += " ORDER BY p.fingerprint"
+        with self._connect() as connection:
+            self._check_version(connection)
+            rows = connection.execute(query, parameters).fetchall()
+        return [self._proposal(row) for row in rows]
+
+    def get(self, fingerprint: str) -> Proposal | None:
+        """Return one current proposal, or ``None`` when it is absent."""
+        with self._connect() as connection:
+            self._check_version(connection)
+            row = connection.execute(
+                "SELECT p.schema_version, p.fingerprint, p.status, r.payload "
+                "FROM proposals p LEFT JOIN revisions r ON r.fingerprint = p.fingerprint "
+                "AND r.revision = p.current_revision WHERE p.fingerprint = ?",
+                (fingerprint,),
+            ).fetchone()
+        return None if row is None else self._proposal(row)
