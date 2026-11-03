@@ -24,6 +24,10 @@ from agent_retro.transcript_io import (
     read_head_tail,
     stream_raw_jsonl,
 )
+from agent_retro.transcript_metadata import (
+    buffered_jsonl_records as _jsonl_records,
+    extract_json_field,
+)
 from agent_retro.transcript_normalize import stream_normalized_jsonl as stream_jsonl
 
 # Approximate pricing per million tokens (Claude Opus 4.6)
@@ -45,34 +49,6 @@ def _is_injected_user_text(text):
         "<environment_context>",
         "# AGENTS.md instructions for ",
     ))
-
-
-def extract_json_field(text, key):
-    """Extract a JSON string field value without full parsing (regex-free).
-    Matches '"key":"value"' or '"key": "value"' patterns."""
-    for pattern in [f'"{key}":"', f'"{key}": "']:
-        idx = text.find(pattern)
-        if idx < 0:
-            continue
-        start = idx + len(pattern)
-        i = start
-        while i < len(text):
-            if text[i] == "\\":
-                i += 2
-                continue
-            if text[i] == '"':
-                return text[start:i]
-            i += 1
-    return None
-
-
-def _jsonl_records(text):
-    """Parse complete JSONL records from a bounded text buffer."""
-    for line in text.splitlines():
-        try:
-            yield json.loads(line)
-        except json.JSONDecodeError:
-            continue
 
 
 def _codex_prompt(records):
