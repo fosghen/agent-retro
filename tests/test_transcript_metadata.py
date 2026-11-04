@@ -1,10 +1,12 @@
 import unittest
+from pathlib import Path
 
 from agent_retro.transcript_metadata import (
     buffered_jsonl_records,
     codex_metadata_lite,
     codex_prompt,
     extract_json_field,
+    extract_metadata_lite,
     is_injected_user_text,
     parse_timestamp,
 )
@@ -79,3 +81,15 @@ class TranscriptMetadataTests(unittest.TestCase):
         self.assertEqual(result["file_size_bytes"], 123)
         self.assertEqual(result["first_prompt"], "review")
         self.assertEqual(result["agent"], "codex")
+
+    def test_common_reader_preserves_claude_and_codex_fixture_metadata(self) -> None:
+        fixtures = Path(__file__).parent / "fixtures"
+        claude = extract_metadata_lite(fixtures / "full_session.jsonl")
+        codex = extract_metadata_lite(fixtures / "codex_session.jsonl")
+        self.assertEqual(claude["agent"], "claude")
+        self.assertEqual(claude["session_id"], "test-session-abc123")
+        self.assertEqual(claude["git_branch"], "feature/add-auth")
+        self.assertEqual(claude["duration_seconds"], 310)
+        self.assertEqual(codex["agent"], "codex")
+        self.assertEqual(codex["session_id"], "codex-session-123")
+        self.assertEqual(codex["first_prompt"], "Review yesterday's sessions.")

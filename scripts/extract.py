@@ -24,9 +24,8 @@ from agent_retro.transcript_io import (
     stream_raw_jsonl,
 )
 from agent_retro.transcript_metadata import (
-    buffered_jsonl_records as _jsonl_records,
-    codex_metadata_lite as _codex_metadata_lite,
     extract_json_field,
+    extract_metadata_lite as _typed_metadata_lite,
     is_injected_user_text as _is_injected_user_text,
     parse_timestamp as parse_ts,
 )
@@ -46,61 +45,8 @@ SCHEMA_VERSION = "0.1.0"
 
 
 def extract_metadata_lite(path):
-    """Extract session metadata from head/tail only — no full parse.
-    Used for session verification and discovery."""
-    head, tail, size = read_head_tail(path)
-
-    if any(item.get("type") == "session_meta" for item in _jsonl_records(head)):
-        return _codex_metadata_lite(head, tail, size)
-
-    # Extract from head (start of session)
-    session_id = extract_json_field(head, "sessionId")
-    cwd = extract_json_field(head, "cwd")
-    git_branch = extract_json_field(head, "gitBranch")
-    version = extract_json_field(head, "version")
-    start_time = extract_json_field(head, "timestamp")
-
-    # Extract from tail (end of session)
-    end_time = extract_json_field(tail, "timestamp")
-    # Scan tail backwards for the last timestamp
-    for line in reversed(tail.split("\n")):
-        ts = extract_json_field(line, "timestamp")
-        if ts:
-            end_time = ts
-            break
-
-    # First user message for verification
-    first_prompt = None
-    for line in head.split("\n"):
-        if '"role":"user"' not in line and '"role": "user"' not in line:
-            continue
-        if '"tool_result"' in line:
-            continue
-        # Try to extract text content
-        text = extract_json_field(line, "text")
-        if text and not text.startswith("<system-reminder>"):
-            first_prompt = text[:200]
-            break
-
-    duration_seconds = None
-    if start_time and end_time:
-        start = parse_ts(start_time)
-        end = parse_ts(end_time)
-        if start and end:
-            duration_seconds = round((end - start).total_seconds())
-
-    return {
-        "session_id": session_id,
-        "cwd": cwd,
-        "git_branch": git_branch,
-        "version": version,
-        "start_time": start_time,
-        "end_time": end_time,
-        "duration_seconds": duration_seconds,
-        "file_size_bytes": size,
-        "first_prompt": first_prompt,
-        "agent": "claude",
-    }
+    """Extract bounded session metadata through the typed compatibility boundary."""
+    return _typed_metadata_lite(path)
 
 
 def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
