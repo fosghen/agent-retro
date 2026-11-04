@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from agent_retro.transcript_aggregate import (
     add_assistant_usage,
@@ -14,10 +14,14 @@ from agent_retro.transcript_aggregate import (
 from agent_retro.transcript_metadata import parse_timestamp
 from agent_retro.transcript_normalize import stream_normalized_jsonl
 
+MAX_MATCH_WINDOW_S = 60
+
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
     from datetime import datetime
 
     from agent_retro.transcript_aggregate import TokenTotals
+    from agent_retro.transcript_io import JSONRecord
 
 
 class SubagentInfo(TypedDict):
@@ -53,3 +57,87 @@ def load_subagent(path: Path) -> SubagentInfo:
 def discover_subagents(directory: str | Path) -> list[SubagentInfo]:
     """Load subagent transcripts in deterministic filename order."""
     return [load_subagent(path) for path in sorted(Path(directory).glob("*.jsonl"))]
+
+
+def project_agents(tool_calls: Iterable[Mapping[str, Any]]) -> list[JSONRecord]:
+    """Project Agent tool calls into the stable result schema."""
+    agents = []
+    for call in tool_calls:
+        if call.get("name") != "Agent":
+            continue
+        agent = {
+            "description": call.get("agent_description", ""),
+            "type": call.get("agent_type", "") or "general-purpose",
+            "model": call.get("agent_model", "") or "inherited",
+            "prompt_preview": call.get("agent_prompt_preview", ""),
+            "background": call.get("run_in_background", False),
+            "timestamp": call.get("timestamp"),
+            "tool_use_id": call.get("tool_use_id", ""),
+            "tokens": None,
+            "estimated_cost_usd": None,
+        }
+        if "result_size_bytes" in call:
+            agent["result_size_bytes"] = call["result_size_bytes"]
+        agents.append(agent)
+    return agents
+
+
+def nearest_dispatch(
+    agents: list[JSONRecord], subagent: SubagentInfo, matched: set[int]
+) -> tuple[int, float] | None:
+    """Find the closest unmatched dispatch inside the matching window."""
+    start_time = subagent["start_time"]
+    if start_time is None:
+        return None
+    best: tuple[int, float] | None = None
+    for index, agent in enumerate(agents):
+        if index in matched:
+            continue
+        dispatch_time = parse_timestamp(agent.get("timestamp"))
+        if dispatch_time is None:
+            continue
+        delta = abs((start_time - dispatch_time).total_seconds())
+        if delta <= MAX_MATCH_WINDOW_S and (best is None or delta < best[1]):
+            best = index, delta
+    return best
+
+
+def match_subagents(agents: list[JSONRecord], subagents: list[SubagentInfo]) -> None:
+    """Match each loaded subagent to at most one nearest dispatch."""
+    matched_dispatches: set[int] = set()
+    matched_subagents: set[int] = set()
+    for subagent_index, subagent in enumerate(subagents):
+        match = nearest_dispatch(agents, subagent, matched_dispatches)
+        if match is None:
+            continue
+        dispatch_index, delta = match
+        agent = agents[dispatch_index]
+        agent["tokens"] = subagent["tokens"]
+        agent["estimated_cost_usd"] = subagent["cost"]
+        agent["subagent_file"] = subagent["file"]
+        agent["match_delta_s"] = round(delta, 1)
+        if subagent["meta"]:
+            agent["meta"] = subagent["meta"]
+        matched_dispatches.add(dispatch_index)
+        matched_subagents.add(subagent_index)
+    for index, subagent in enumerate(subagents):
+        if index not in matched_subagents:
+            agents.append(_unmatched_agent(subagent))
+
+
+def _unmatched_agent(subagent: SubagentInfo) -> JSONRecord:
+    start_time = subagent["start_time"]
+    return {
+        "description": f"[unmatched subagent: {subagent['file']}]",
+        "type": "unknown",
+        "model": "unknown",
+        "prompt_preview": "",
+        "background": False,
+        "timestamp": str(start_time) if start_time else None,
+        "tool_use_id": "",
+        "tokens": subagent["tokens"],
+        "estimated_cost_usd": subagent["cost"],
+        "subagent_file": subagent["file"],
+        "match_confidence": "unmatched",
+        "meta": subagent["meta"],
+    }

@@ -36,7 +36,8 @@ from agent_retro.transcript_metadata import (
     parse_timestamp as parse_ts,
 )
 from agent_retro.transcript_normalize import stream_normalized_jsonl as stream_jsonl
-from agent_retro.transcript_subagents import discover_subagents
+from agent_retro.transcript_subagents import discover_subagents, project_agents
+from agent_retro.transcript_subagents import match_subagents
 
 SCHEMA_VERSION = "0.1.0"
 
@@ -339,23 +340,7 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
 
 def _extract_agents(tool_calls, subagents_dir=None):
     """Extract agent dispatch details and match with subagent JSONL files."""
-    agents = []
-    for call in tool_calls:
-        if call["name"] == "Agent":
-            agent = {
-                "description": call.get("agent_description", ""),
-                "type": call.get("agent_type", "") or "general-purpose",
-                "model": call.get("agent_model", "") or "inherited",
-                "prompt_preview": call.get("agent_prompt_preview", ""),
-                "background": call.get("run_in_background", False),
-                "timestamp": call.get("timestamp"),
-                "tool_use_id": call.get("tool_use_id", ""),
-                "tokens": None,
-                "estimated_cost_usd": None,
-            }
-            if "result_size_bytes" in call:
-                agent["result_size_bytes"] = call["result_size_bytes"]
-            agents.append(agent)
+    agents = project_agents(tool_calls)
 
     if subagents_dir and os.path.isdir(subagents_dir):
         _match_subagent_files(agents, subagents_dir)
@@ -365,57 +350,7 @@ def _extract_agents(tool_calls, subagents_dir=None):
 
 def _match_subagent_files(agents, subagents_dir):
     """Match subagent JSONL files to dispatches using timestamp proximity."""
-    MAX_MATCH_WINDOW_S = 60
-    subagent_info = discover_subagents(subagents_dir)
-
-    # Match by timestamp proximity
-    matched_dispatches = set()
-    matched_subagents = set()
-
-    for sa_idx, sa in enumerate(subagent_info):
-        if not sa["start_time"]:
-            continue
-        best_match = None
-        best_delta = None
-
-        for ag_idx, agent in enumerate(agents):
-            if ag_idx in matched_dispatches:
-                continue
-            dispatch_time = parse_ts(agent["timestamp"])
-            if not dispatch_time:
-                continue
-            delta = abs((sa["start_time"] - dispatch_time).total_seconds())
-            if delta <= MAX_MATCH_WINDOW_S and (best_delta is None or delta < best_delta):
-                best_match = ag_idx
-                best_delta = delta
-
-        if best_match is not None:
-            agents[best_match]["tokens"] = sa["tokens"]
-            agents[best_match]["estimated_cost_usd"] = sa["cost"]
-            agents[best_match]["subagent_file"] = sa["file"]
-            agents[best_match]["match_delta_s"] = round(best_delta, 1)
-            if sa["meta"]:
-                agents[best_match]["meta"] = sa["meta"]
-            matched_dispatches.add(best_match)
-            matched_subagents.add(sa_idx)
-
-    # Report unmatched subagents
-    for sa_idx, sa in enumerate(subagent_info):
-        if sa_idx not in matched_subagents:
-            agents.append({
-                "description": f"[unmatched subagent: {sa['file']}]",
-                "type": "unknown",
-                "model": "unknown",
-                "prompt_preview": "",
-                "background": False,
-                "timestamp": str(sa["start_time"]) if sa["start_time"] else None,
-                "tool_use_id": "",
-                "tokens": sa["tokens"],
-                "estimated_cost_usd": sa["cost"],
-                "subagent_file": sa["file"],
-                "match_confidence": "unmatched",
-                "meta": sa["meta"],
-            })
+    match_subagents(agents, discover_subagents(subagents_dir))
 
 
 if __name__ == "__main__":
