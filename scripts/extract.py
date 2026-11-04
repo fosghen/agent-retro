@@ -22,6 +22,7 @@ from agent_retro.transcript_aggregate import (
     add_assistant_usage,
     empty_token_totals,
     estimated_cost,
+    result_size_bytes,
 )
 from agent_retro.transcript_io import (
     LITE_READ_BUF_SIZE,
@@ -187,28 +188,8 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
                 # Tool result blocks — capture SIZE only, not content
                 elif block_type == "tool_result":
                     tool_use_id = block.get("tool_use_id", "")
-                    result_content = block.get("content", "")
-                    if isinstance(result_content, str):
-                        size_bytes = len(result_content.encode("utf-8", errors="replace"))
-                    elif isinstance(result_content, list):
-                        # Multi-block results (e.g., images + text)
-                        size_bytes = 0
-                        for rb in result_content:
-                            if isinstance(rb, dict):
-                                text = rb.get("text", "")
-                                if text:
-                                    size_bytes += len(text.encode("utf-8", errors="replace"))
-                                # Image/binary blocks — estimate from base64 if present
-                                data = rb.get("data", "")
-                                if data:
-                                    size_bytes += len(data)
-                            elif isinstance(rb, str):
-                                size_bytes += len(rb.encode("utf-8", errors="replace"))
-                    else:
-                        size_bytes = len(json.dumps(result_content).encode("utf-8"))
-
                     if tool_use_id:
-                        tool_result_sizes[tool_use_id] = size_bytes
+                        tool_result_sizes[tool_use_id] = result_size_bytes(block.get("content", ""))
 
                 # Text blocks — conversation arc (both assistant AND user)
                 elif block_type == "text":
