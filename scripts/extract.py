@@ -26,6 +26,7 @@ from agent_retro.transcript_aggregate import (
     result_size_bytes,
     result_size_stats,
 )
+from agent_retro.transcript_conversation import assistant_arc_item
 from agent_retro.transcript_io import (
     LITE_READ_BUF_SIZE,
     detect_transcript_format,
@@ -195,13 +196,9 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
 
                 # Text blocks — conversation arc (both assistant AND user)
                 elif block_type == "text":
-                    text = block.get("text", "").strip()
-                    if role == "assistant" and text and len(text) > 20:
-                        arc.append({
-                            "role": "assistant",
-                            "text": text[:1000],
-                            "timestamp": ts,
-                        })
+                    item = assistant_arc_item(block, role, ts)
+                    if item is not None:
+                        arc.append(item)
 
             # After processing all blocks in a list-format user message,
             # collect text blocks into the arc
