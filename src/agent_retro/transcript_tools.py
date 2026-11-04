@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
@@ -96,3 +97,28 @@ def record_tool_activity(
         commits.append(activity)
     if "gh pr" in command:
         prs.append(activity)
+
+
+def skill_summaries(tool_calls: list[JSONRecord]) -> list[JSONRecord]:
+    """Project Skill calls into the stable top-level skill schema."""
+    return [
+        {
+            "name": call.get("skill_name", ""),
+            "args": call.get("skill_args", ""),
+            "timestamp": call.get("timestamp"),
+        }
+        for call in tool_calls
+        if call.get("name") == "Skill"
+    ]
+
+
+def tool_result_view(tool_calls: list[JSONRecord], *, summary: bool) -> JSONRecord:
+    """Build deterministic summary or full tool output."""
+    counts = Counter(str(call.get("name", "unknown")) for call in tool_calls)
+    result: JSONRecord = {
+        "counts": dict(counts.most_common()),
+        "total_calls": len(tool_calls),
+    }
+    if not summary:
+        result["calls"] = tool_calls
+    return result
