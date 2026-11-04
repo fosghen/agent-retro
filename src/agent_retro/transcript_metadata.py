@@ -96,3 +96,28 @@ def codex_metadata_lite(head: str, tail: str, size: int) -> JSONRecord:
         "first_prompt": codex_prompt(records),
         "agent": "codex",
     }
+
+
+def _last_timestamp(tail: str) -> str | None:
+    for line in reversed(tail.splitlines()):
+        timestamp = extract_json_field(line, "timestamp")
+        if timestamp:
+            return timestamp
+    return extract_json_field(tail, "timestamp")
+
+
+def _first_claude_prompt(head: str) -> str | None:
+    for line in head.splitlines():
+        if '"role":"user"' not in line and '"role": "user"' not in line:
+            continue
+        if '"tool_result"' in line:
+            continue
+        text = extract_json_field(line, "text")
+        if text and not text.startswith("<system-reminder>"):
+            return text[:200]
+    return None
+
+
+def _duration_seconds(start_time: object, end_time: object) -> int | None:
+    start, end = parse_timestamp(start_time), parse_timestamp(end_time)
+    return round((end - start).total_seconds()) if start and end else None
