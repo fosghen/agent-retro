@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from typing import TypedDict
 
@@ -59,3 +60,23 @@ def estimated_cost(tokens: TokenTotals, agent: str = "claude") -> float | None:
         + tokens["cache_creation_input_tokens"] / 1_000_000 * PRICE_PER_M["cache_create"]
         + tokens["cache_read_input_tokens"] / 1_000_000 * PRICE_PER_M["cache_read"]
     )
+
+
+def result_size_bytes(content: object) -> int:
+    """Measure one tool result without retaining its content."""
+    if isinstance(content, str):
+        return len(content.encode("utf-8", errors="replace"))
+    if isinstance(content, list):
+        size = 0
+        for block in content:
+            if isinstance(block, dict):
+                text = block.get("text", "")
+                data = block.get("data", "")
+                if isinstance(text, str):
+                    size += len(text.encode("utf-8", errors="replace"))
+                if isinstance(data, str):
+                    size += len(data)
+            elif isinstance(block, str):
+                size += len(block.encode("utf-8", errors="replace"))
+        return size
+    return len(json.dumps(content).encode("utf-8"))
