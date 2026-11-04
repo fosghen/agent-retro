@@ -16,7 +16,6 @@ import os
 import glob
 from collections import Counter, defaultdict
 from pathlib import Path
-from datetime import datetime
 
 from agent_retro.transcript_io import (
     LITE_READ_BUF_SIZE,
@@ -26,9 +25,10 @@ from agent_retro.transcript_io import (
 )
 from agent_retro.transcript_metadata import (
     buffered_jsonl_records as _jsonl_records,
-    codex_prompt as _codex_prompt,
+    codex_metadata_lite as _codex_metadata_lite,
     extract_json_field,
     is_injected_user_text as _is_injected_user_text,
+    parse_timestamp as parse_ts,
 )
 from agent_retro.transcript_normalize import stream_normalized_jsonl as stream_jsonl
 
@@ -45,42 +45,13 @@ PRICE_PER_M = {
 SCHEMA_VERSION = "0.1.0"
 
 
-def _codex_metadata_lite(path, head, tail, size):
-    """Extract bounded metadata from a Codex rollout."""
-    records = list(_jsonl_records(head)) + list(_jsonl_records(tail))
-    meta = next(
-        (item.get("payload") or {} for item in records if item.get("type") == "session_meta"),
-        {},
-    )
-    timestamps = [item.get("timestamp") for item in records if item.get("timestamp")]
-    start_time = timestamps[0] if timestamps else meta.get("timestamp")
-    end_time = timestamps[-1] if timestamps else start_time
-    start, end = parse_ts(start_time), parse_ts(end_time)
-    duration = round((end - start).total_seconds()) if start and end else None
-    prompt = _codex_prompt(records)
-    if prompt is None:
-        prompt = _codex_prompt(stream_raw_jsonl(path))
-    return {
-        "session_id": meta.get("session_id") or meta.get("id"),
-        "cwd": meta.get("cwd"),
-        "git_branch": None,
-        "version": meta.get("cli_version"),
-        "start_time": start_time,
-        "end_time": end_time,
-        "duration_seconds": duration,
-        "file_size_bytes": size,
-        "first_prompt": prompt,
-        "agent": "codex",
-    }
-
-
 def extract_metadata_lite(path):
     """Extract session metadata from head/tail only — no full parse.
     Used for session verification and discovery."""
     head, tail, size = read_head_tail(path)
 
     if any(item.get("type") == "session_meta" for item in _jsonl_records(head)):
-        return _codex_metadata_lite(path, head, tail, size)
+        return _codex_metadata_lite(head, tail, size)
 
     # Extract from head (start of session)
     session_id = extract_json_field(head, "sessionId")
@@ -130,16 +101,6 @@ def extract_metadata_lite(path):
         "first_prompt": first_prompt,
         "agent": "claude",
     }
-
-
-def parse_ts(ts_str):
-    """Parse ISO 8601 timestamp string to datetime."""
-    if not ts_str:
-        return None
-    try:
-        return datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
-    except (ValueError, TypeError):
-        return None
 
 
 def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
