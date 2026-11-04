@@ -41,6 +41,7 @@ from agent_retro.transcript_metadata import (
 )
 from agent_retro.transcript_normalize import stream_normalized_jsonl as stream_jsonl
 from agent_retro.transcript_session import empty_session, finalize_session, record_session
+from agent_retro.transcript_stream import new_stream_state, process_record
 from agent_retro.transcript_subagents import discover_subagents, project_agents
 from agent_retro.transcript_subagents import match_subagents
 from agent_retro.transcript_tools import (
@@ -63,79 +64,21 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
 
     transcript_format = detect_transcript_format(jsonl_path)
 
-    # Session metadata
-    session = empty_session(transcript_format)
-
-    # Token totals
-    tokens_total = empty_token_totals()
+    state = new_stream_state(transcript_format)
+    session = state.session
+    tokens_total = state.tokens
     turn_count = 0
-
-    # Tool tracking
-    tool_calls = []
-
-    # Tool result sizes (tool_use_id -> size in bytes)
-    tool_result_sizes = {}
-
-    # Conversation arc
-    arc = []
-
-    # Git tracking
-    branches = set()
-    commits = []
-    prs = []
-
-    # File tracking
-    files = defaultdict(set)
+    tool_calls = state.tool_calls
+    tool_result_sizes = state.tool_result_sizes
+    arc = state.arc
+    branches = state.branches
+    commits = state.commits
+    prs = state.prs
+    files = state.files
 
     for rec in stream_jsonl(jsonl_path):
-        # --- Session metadata ---
-        record_session(session, rec)
-        branch = rec.get("gitBranch")
-        if isinstance(branch, str):
-            branches.add(branch)
-        ts = rec.get("timestamp")
-
-        msg = rec.get("message", {})
-        role = msg.get("role")
-        content = msg.get("content", "")
-        usage = msg.get("usage", {})
-
-        # --- Token usage (assistant messages only) ---
-        if add_assistant_usage(tokens_total, role, usage):
-            turn_count += 1
-
-        # --- Process content blocks ---
-        if isinstance(content, list):
-            for block in content:
-                if not isinstance(block, dict):
-                    continue
-
-                block_type = block.get("type")
-
-                # Tool use blocks (assistant calling tools)
-                if block_type == "tool_use":
-                    name = block.get("name", "unknown")
-                    tool_input = block.get("input", {})
-
-                    call_summary = tool_call_summary(block, ts)
-                    tool_calls.append(call_summary)
-                    record_tool_activity(call_summary, tool_input, files, commits, prs)
-
-                # Tool result blocks — capture SIZE only, not content
-                elif block_type == "tool_result":
-                    tool_use_id = block.get("tool_use_id", "")
-                    if tool_use_id:
-                        tool_result_sizes[tool_use_id] = result_size_bytes(block.get("content", ""))
-
-                # Text blocks — conversation arc (both assistant AND user)
-                elif block_type == "text":
-                    item = assistant_arc_item(block, role, ts)
-                    if item is not None:
-                        arc.append(item)
-
-        user_item = user_arc_item(content, role, ts)
-        if user_item is not None:
-            arc.append(user_item)
+        process_record(state, rec)
+    turn_count = state.turn_count
 
     # --- Post-processing ---
 
