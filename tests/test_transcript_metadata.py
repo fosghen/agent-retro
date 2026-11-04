@@ -2,9 +2,11 @@ import unittest
 
 from agent_retro.transcript_metadata import (
     buffered_jsonl_records,
+    codex_metadata_lite,
     codex_prompt,
     extract_json_field,
     is_injected_user_text,
+    parse_timestamp,
 )
 
 
@@ -48,3 +50,32 @@ class TranscriptMetadataTests(unittest.TestCase):
             },
         ]
         self.assertEqual(codex_prompt(records), "x" * 200)
+
+    def test_timestamp_parser_accepts_utc_and_rejects_invalid_values(self) -> None:
+        parsed = parse_timestamp("2026-11-04T10:00:00Z")
+        if parsed is None:
+            self.fail("valid UTC timestamp was rejected")
+        offset = parsed.utcoffset()
+        if offset is None:
+            self.fail("UTC timestamp is naive")
+        self.assertEqual(offset.total_seconds(), 0)
+        for value in (None, "", "invalid"):
+            with self.subTest(value=value):
+                self.assertIsNone(parse_timestamp(value))
+
+    def test_codex_metadata_uses_only_supplied_bounded_buffers(self) -> None:
+        head = (
+            '{"type":"session_meta","timestamp":"2026-11-04T10:00:00Z",'
+            '"payload":{"id":"one","cwd":"/workspace","cli_version":"1.0"}}\n'
+            '{"type":"response_item","timestamp":"2026-11-04T10:00:01Z",'
+            '"payload":{"type":"message","role":"user","content":[{"text":"review"}]}}'
+        )
+        tail = '{"type":"event","timestamp":"2026-11-04T10:00:05Z"}'
+        result = codex_metadata_lite(head, tail, 123)
+        self.assertEqual(result["session_id"], "one")
+        self.assertEqual(result["cwd"], "/workspace")
+        self.assertEqual(result["version"], "1.0")
+        self.assertEqual(result["duration_seconds"], 5)
+        self.assertEqual(result["file_size_bytes"], 123)
+        self.assertEqual(result["first_prompt"], "review")
+        self.assertEqual(result["agent"], "codex")
