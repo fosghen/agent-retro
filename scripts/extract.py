@@ -26,8 +26,12 @@ from agent_retro.transcript_io import (
 from agent_retro.transcript_metadata import (
     buffered_jsonl_records as _jsonl_records,
     codex_metadata_lite as _codex_metadata_lite,
+    _duration_seconds as duration_seconds,
     extract_json_field,
+    extract_metadata_lite as _typed_metadata_lite,
+    _first_claude_prompt as first_claude_prompt,
     is_injected_user_text as _is_injected_user_text,
+    _last_timestamp as last_timestamp,
     parse_timestamp as parse_ts,
 )
 from agent_retro.transcript_normalize import stream_normalized_jsonl as stream_jsonl
@@ -61,33 +65,9 @@ def extract_metadata_lite(path):
     start_time = extract_json_field(head, "timestamp")
 
     # Extract from tail (end of session)
-    end_time = extract_json_field(tail, "timestamp")
-    # Scan tail backwards for the last timestamp
-    for line in reversed(tail.split("\n")):
-        ts = extract_json_field(line, "timestamp")
-        if ts:
-            end_time = ts
-            break
-
-    # First user message for verification
-    first_prompt = None
-    for line in head.split("\n"):
-        if '"role":"user"' not in line and '"role": "user"' not in line:
-            continue
-        if '"tool_result"' in line:
-            continue
-        # Try to extract text content
-        text = extract_json_field(line, "text")
-        if text and not text.startswith("<system-reminder>"):
-            first_prompt = text[:200]
-            break
-
-    duration_seconds = None
-    if start_time and end_time:
-        start = parse_ts(start_time)
-        end = parse_ts(end_time)
-        if start and end:
-            duration_seconds = round((end - start).total_seconds())
+    end_time = last_timestamp(tail)
+    first_prompt = first_claude_prompt(head)
+    duration = duration_seconds(start_time, end_time)
 
     return {
         "session_id": session_id,
@@ -96,7 +76,7 @@ def extract_metadata_lite(path):
         "version": version,
         "start_time": start_time,
         "end_time": end_time,
-        "duration_seconds": duration_seconds,
+        "duration_seconds": duration,
         "file_size_bytes": size,
         "first_prompt": first_prompt,
         "agent": "claude",
