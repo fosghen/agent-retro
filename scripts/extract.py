@@ -37,7 +37,7 @@ from agent_retro.transcript_metadata import (
 )
 from agent_retro.transcript_normalize import stream_normalized_jsonl as stream_jsonl
 from agent_retro.transcript_subagents import discover_subagents, project_agents
-from agent_retro.transcript_subagents import nearest_dispatch
+from agent_retro.transcript_subagents import match_subagents
 
 SCHEMA_VERSION = "0.1.0"
 
@@ -350,44 +350,7 @@ def _extract_agents(tool_calls, subagents_dir=None):
 
 def _match_subagent_files(agents, subagents_dir):
     """Match subagent JSONL files to dispatches using timestamp proximity."""
-    subagent_info = discover_subagents(subagents_dir)
-
-    # Match by timestamp proximity
-    matched_dispatches = set()
-    matched_subagents = set()
-
-    for sa_idx, sa in enumerate(subagent_info):
-        if not sa["start_time"]:
-            continue
-        match = nearest_dispatch(agents, sa, matched_dispatches)
-        if match is not None:
-            best_match, best_delta = match
-            agents[best_match]["tokens"] = sa["tokens"]
-            agents[best_match]["estimated_cost_usd"] = sa["cost"]
-            agents[best_match]["subagent_file"] = sa["file"]
-            agents[best_match]["match_delta_s"] = round(best_delta, 1)
-            if sa["meta"]:
-                agents[best_match]["meta"] = sa["meta"]
-            matched_dispatches.add(best_match)
-            matched_subagents.add(sa_idx)
-
-    # Report unmatched subagents
-    for sa_idx, sa in enumerate(subagent_info):
-        if sa_idx not in matched_subagents:
-            agents.append({
-                "description": f"[unmatched subagent: {sa['file']}]",
-                "type": "unknown",
-                "model": "unknown",
-                "prompt_preview": "",
-                "background": False,
-                "timestamp": str(sa["start_time"]) if sa["start_time"] else None,
-                "tool_use_id": "",
-                "tokens": sa["tokens"],
-                "estimated_cost_usd": sa["cost"],
-                "subagent_file": sa["file"],
-                "match_confidence": "unmatched",
-                "meta": sa["meta"],
-            })
+    match_subagents(agents, discover_subagents(subagents_dir))
 
 
 if __name__ == "__main__":
