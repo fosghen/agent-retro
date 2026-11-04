@@ -17,6 +17,13 @@ import glob
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from agent_retro.transcript_aggregate import (
+    PRICE_PER_M,
+    PRICING_LAST_VERIFIED,
+    add_assistant_usage,
+    empty_token_totals,
+    estimated_cost,
+)
 from agent_retro.transcript_io import (
     LITE_READ_BUF_SIZE,
     detect_transcript_format,
@@ -30,16 +37,6 @@ from agent_retro.transcript_metadata import (
     parse_timestamp as parse_ts,
 )
 from agent_retro.transcript_normalize import stream_normalized_jsonl as stream_jsonl
-
-# Approximate pricing per million tokens (Claude Opus 4.6)
-# Update these when Anthropic changes pricing and bump PRICING_LAST_VERIFIED.
-PRICING_LAST_VERIFIED = "2026-04-06"
-PRICE_PER_M = {
-    "input": 15.0,
-    "output": 75.0,
-    "cache_create": 18.75,  # 1.25x input
-    "cache_read": 1.50,     # 0.1x input
-}
 
 SCHEMA_VERSION = "0.1.0"
 
@@ -68,12 +65,7 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
     }
 
     # Token totals
-    tokens_total = {
-        "input_tokens": 0,
-        "output_tokens": 0,
-        "cache_creation_input_tokens": 0,
-        "cache_read_input_tokens": 0,
-    }
+    tokens_total = empty_token_totals()
     turn_count = 0
 
     # Tool tracking
@@ -121,11 +113,7 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
         usage = msg.get("usage", {})
 
         # --- Token usage (assistant messages only) ---
-        if usage and role == "assistant":
-            tokens_total["input_tokens"] += usage.get("input_tokens", 0)
-            tokens_total["output_tokens"] += usage.get("output_tokens", 0)
-            tokens_total["cache_creation_input_tokens"] += usage.get("cache_creation_input_tokens", 0)
-            tokens_total["cache_read_input_tokens"] += usage.get("cache_read_input_tokens", 0)
+        if add_assistant_usage(tokens_total, role, usage):
             turn_count += 1
 
         # --- Process content blocks ---
@@ -272,14 +260,7 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
     session["branches_seen"] = sorted(session["branches_seen"])
 
     # Compute cost
-    cost = None
-    if transcript_format == "claude":
-        cost = (
-            tokens_total["input_tokens"] / 1_000_000 * PRICE_PER_M["input"]
-            + tokens_total["output_tokens"] / 1_000_000 * PRICE_PER_M["output"]
-            + tokens_total["cache_creation_input_tokens"] / 1_000_000 * PRICE_PER_M["cache_create"]
-            + tokens_total["cache_read_input_tokens"] / 1_000_000 * PRICE_PER_M["cache_read"]
-        )
+    cost = estimated_cost(tokens_total, transcript_format)
 
     # Attach result sizes to tool calls
     for call in tool_calls:
