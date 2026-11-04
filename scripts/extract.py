@@ -24,14 +24,9 @@ from agent_retro.transcript_io import (
     stream_raw_jsonl,
 )
 from agent_retro.transcript_metadata import (
-    buffered_jsonl_records as _jsonl_records,
-    codex_metadata_lite as _codex_metadata_lite,
-    _duration_seconds as duration_seconds,
     extract_json_field,
     extract_metadata_lite as _typed_metadata_lite,
-    _first_claude_prompt as first_claude_prompt,
     is_injected_user_text as _is_injected_user_text,
-    _last_timestamp as last_timestamp,
     parse_timestamp as parse_ts,
 )
 from agent_retro.transcript_normalize import stream_normalized_jsonl as stream_jsonl
@@ -50,37 +45,8 @@ SCHEMA_VERSION = "0.1.0"
 
 
 def extract_metadata_lite(path):
-    """Extract session metadata from head/tail only — no full parse.
-    Used for session verification and discovery."""
-    head, tail, size = read_head_tail(path)
-
-    if any(item.get("type") == "session_meta" for item in _jsonl_records(head)):
-        return _codex_metadata_lite(head, tail, size)
-
-    # Extract from head (start of session)
-    session_id = extract_json_field(head, "sessionId")
-    cwd = extract_json_field(head, "cwd")
-    git_branch = extract_json_field(head, "gitBranch")
-    version = extract_json_field(head, "version")
-    start_time = extract_json_field(head, "timestamp")
-
-    # Extract from tail (end of session)
-    end_time = last_timestamp(tail)
-    first_prompt = first_claude_prompt(head)
-    duration = duration_seconds(start_time, end_time)
-
-    return {
-        "session_id": session_id,
-        "cwd": cwd,
-        "git_branch": git_branch,
-        "version": version,
-        "start_time": start_time,
-        "end_time": end_time,
-        "duration_seconds": duration,
-        "file_size_bytes": size,
-        "first_prompt": first_prompt,
-        "agent": "claude",
-    }
+    """Extract bounded session metadata through the typed compatibility boundary."""
+    return _typed_metadata_lite(path)
 
 
 def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
