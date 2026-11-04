@@ -370,29 +370,19 @@ def _match_subagent_files(agents, subagents_dir):
 
     subagent_info = []
     for sa_file in subagent_files:
-        sa_tokens = {"input_tokens": 0, "output_tokens": 0,
-                     "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0}
+        sa_tokens = empty_token_totals()
         sa_start = None
         turn_count = 0
 
         for rec in stream_jsonl(sa_file):
             msg = rec.get("message", {})
             usage = msg.get("usage", {})
-            if usage and msg.get("role") == "assistant":
-                sa_tokens["input_tokens"] += usage.get("input_tokens", 0)
-                sa_tokens["output_tokens"] += usage.get("output_tokens", 0)
-                sa_tokens["cache_creation_input_tokens"] += usage.get("cache_creation_input_tokens", 0)
-                sa_tokens["cache_read_input_tokens"] += usage.get("cache_read_input_tokens", 0)
+            if add_assistant_usage(sa_tokens, msg.get("role"), usage):
                 turn_count += 1
             if sa_start is None and "timestamp" in rec:
                 sa_start = parse_ts(rec["timestamp"])
 
-        sa_cost = (
-            sa_tokens["input_tokens"] / 1_000_000 * PRICE_PER_M["input"]
-            + sa_tokens["output_tokens"] / 1_000_000 * PRICE_PER_M["output"]
-            + sa_tokens["cache_creation_input_tokens"] / 1_000_000 * PRICE_PER_M["cache_create"]
-            + sa_tokens["cache_read_input_tokens"] / 1_000_000 * PRICE_PER_M["cache_read"]
-        )
+        sa_cost = estimated_cost(sa_tokens) or 0.0
 
         # Load meta file if present
         meta = None

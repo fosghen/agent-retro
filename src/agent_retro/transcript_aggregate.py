@@ -59,5 +59,3 @@ def estimated_cost(tokens: TokenTotals, agent: str = "claude") -> float | None:
         + tokens["cache_creation_input_tokens"] / 1_000_000 * PRICE_PER_M["cache_create"]
         + tokens["cache_read_input_tokens"] / 1_000_000 * PRICE_PER_M["cache_read"]
     )
-
-
