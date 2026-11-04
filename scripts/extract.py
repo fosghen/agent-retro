@@ -42,7 +42,7 @@ from agent_retro.transcript_metadata import (
 from agent_retro.transcript_normalize import stream_normalized_jsonl as stream_jsonl
 from agent_retro.transcript_subagents import discover_subagents, project_agents
 from agent_retro.transcript_subagents import match_subagents
-from agent_retro.transcript_tools import tool_call_summary
+from agent_retro.transcript_tools import record_tool_activity, tool_call_summary
 
 SCHEMA_VERSION = "0.1.0"
 
@@ -139,24 +139,7 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
 
                     call_summary = tool_call_summary(block, ts)
                     tool_calls.append(call_summary)
-
-                    # Track files
-                    fp = tool_input.get("file_path", "")
-                    if fp:
-                        if name == "Read":
-                            files["read"].add(fp)
-                        elif name == "Write":
-                            files["written"].add(fp)
-                        elif name == "Edit":
-                            files["edited"].add(fp)
-
-                    # Track git activity from bash commands
-                    if name in ("Bash", "exec", "exec_command"):
-                        cmd = tool_input.get("command", "")
-                        if "git commit" in cmd:
-                            commits.append({"command": cmd[:200], "timestamp": ts})
-                        if "gh pr" in cmd:
-                            prs.append({"command": cmd[:200], "timestamp": ts})
+                    record_tool_activity(call_summary, tool_input, files, commits, prs)
 
                 # Tool result blocks — capture SIZE only, not content
                 elif block_type == "tool_result":
