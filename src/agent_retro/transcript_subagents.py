@@ -99,3 +99,44 @@ def _nearest_dispatch(
         if delta <= MAX_MATCH_WINDOW_S and (best is None or delta < best[1]):
             best = index, delta
     return best
+
+
+def match_subagents(agents: list[JSONRecord], subagents: list[SubagentInfo]) -> None:
+    """Match each loaded subagent to at most one nearest dispatch."""
+    matched_dispatches: set[int] = set()
+    matched_subagents: set[int] = set()
+    for subagent_index, subagent in enumerate(subagents):
+        match = _nearest_dispatch(agents, subagent, matched_dispatches)
+        if match is None:
+            continue
+        dispatch_index, delta = match
+        agent = agents[dispatch_index]
+        agent["tokens"] = subagent["tokens"]
+        agent["estimated_cost_usd"] = subagent["cost"]
+        agent["subagent_file"] = subagent["file"]
+        agent["match_delta_s"] = round(delta, 1)
+        if subagent["meta"]:
+            agent["meta"] = subagent["meta"]
+        matched_dispatches.add(dispatch_index)
+        matched_subagents.add(subagent_index)
+    for index, subagent in enumerate(subagents):
+        if index not in matched_subagents:
+            agents.append(_unmatched_agent(subagent))
+
+
+def _unmatched_agent(subagent: SubagentInfo) -> JSONRecord:
+    start_time = subagent["start_time"]
+    return {
+        "description": f"[unmatched subagent: {subagent['file']}]",
+        "type": "unknown",
+        "model": "unknown",
+        "prompt_preview": "",
+        "background": False,
+        "timestamp": str(start_time) if start_time else None,
+        "tool_use_id": "",
+        "tokens": subagent["tokens"],
+        "estimated_cost_usd": subagent["cost"],
+        "subagent_file": subagent["file"],
+        "match_confidence": "unmatched",
+        "meta": subagent["meta"],
+    }
