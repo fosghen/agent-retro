@@ -13,7 +13,7 @@ Use --metadata-only for cheap session verification (head/tail read only).
 import json
 import sys
 import os
-from collections import Counter, defaultdict
+from collections import defaultdict
 from pathlib import Path
 
 from agent_retro.transcript_aggregate import (
@@ -42,7 +42,12 @@ from agent_retro.transcript_metadata import (
 from agent_retro.transcript_normalize import stream_normalized_jsonl as stream_jsonl
 from agent_retro.transcript_subagents import discover_subagents, project_agents
 from agent_retro.transcript_subagents import match_subagents
-from agent_retro.transcript_tools import record_tool_activity, tool_call_summary
+from agent_retro.transcript_tools import (
+    record_tool_activity,
+    skill_summaries,
+    tool_call_summary,
+    tool_result_view,
+)
 
 SCHEMA_VERSION = "0.1.0"
 
@@ -76,8 +81,6 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
 
     # Tool tracking
     tool_calls = []
-    tool_counts = Counter()
-    total_tool_calls = 0
 
     # Tool result sizes (tool_use_id -> size in bytes)
     tool_result_sizes = {}
@@ -134,8 +137,6 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
                 if block_type == "tool_use":
                     name = block.get("name", "unknown")
                     tool_input = block.get("input", {})
-                    tool_counts[name] += 1
-                    total_tool_calls += 1
 
                     call_summary = tool_call_summary(block, ts)
                     tool_calls.append(call_summary)
@@ -176,12 +177,6 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
     # Extract agents
     agents = _extract_agents(tool_calls, subagents_dir)
 
-    # Extract skills
-    skills = [
-        {"name": c.get("skill_name", ""), "args": c.get("skill_args", ""), "timestamp": c.get("timestamp")}
-        for c in tool_calls if c["name"] == "Skill"
-    ]
-
     # Warn if agents exist but have no cost data (subagents_dir missing)
     agents_without_cost = [a for a in agents if a.get("estimated_cost_usd") is None
                            and a.get("description") and not a.get("description", "").startswith("[unmatched")]
@@ -200,7 +195,7 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
             "estimated_cost_usd": round(cost, 4) if cost is not None else None,
         },
         "agents": agents,
-        "skills": skills,
+        "skills": skill_summaries(tool_calls),
         "git": {
             "branches": sorted(branches),
             "commits": commits,
@@ -209,19 +204,8 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
         "files": {k: sorted(v) for k, v in files.items()},
         "conversation_arc": arc,
         "tool_result_sizes": result_size_summary,
+        "tools": tool_result_view(tool_calls, summary=summary_mode),
     }
-
-    if summary_mode:
-        result["tools"] = {
-            "counts": dict(tool_counts.most_common()),
-            "total_calls": total_tool_calls,
-        }
-    else:
-        result["tools"] = {
-            "calls": tool_calls,
-            "counts": dict(tool_counts.most_common()),
-            "total_calls": total_tool_calls,
-        }
 
     return result
 
