@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+import json
+from collections import defaultdict
 from collections.abc import Mapping
-from typing import TypedDict
+from typing import TYPE_CHECKING, TypedDict
+
+if TYPE_CHECKING:
+    from agent_retro.transcript_io import JSONRecord
 
 PRICING_LAST_VERIFIED = "2026-04-06"
 PRICE_PER_M = {
@@ -59,3 +64,50 @@ def estimated_cost(tokens: TokenTotals, agent: str = "claude") -> float | None:
         + tokens["cache_creation_input_tokens"] / 1_000_000 * PRICE_PER_M["cache_create"]
         + tokens["cache_read_input_tokens"] / 1_000_000 * PRICE_PER_M["cache_read"]
     )
+
+
+def result_size_bytes(content: object) -> int:
+    """Measure one tool result without retaining its content."""
+    if isinstance(content, str):
+        return len(content.encode("utf-8", errors="replace"))
+    if isinstance(content, list):
+        size = 0
+        for block in content:
+            if isinstance(block, dict):
+                text = block.get("text", "")
+                data = block.get("data", "")
+                if isinstance(text, str):
+                    size += len(text.encode("utf-8", errors="replace"))
+                if isinstance(data, str):
+                    size += len(data)
+            elif isinstance(block, str):
+                size += len(block.encode("utf-8", errors="replace"))
+        return size
+    return len(json.dumps(content).encode("utf-8"))
+
+
+def attach_result_sizes(tool_calls: list[JSONRecord], sizes: Mapping[str, int]) -> None:
+    """Attach measured results to their originating tool calls."""
+    for call in tool_calls:
+        tool_use_id = call.get("tool_use_id")
+        if isinstance(tool_use_id, str) and tool_use_id in sizes:
+            call["result_size_bytes"] = sizes[tool_use_id]
+
+
+def result_size_stats(tool_calls: list[JSONRecord]) -> JSONRecord:
+    """Aggregate attached result sizes by tool name."""
+    sizes_by_tool: dict[str, list[int]] = defaultdict(list)
+    for call in tool_calls:
+        name, size = call.get("name"), call.get("result_size_bytes")
+        if isinstance(name, str) and isinstance(size, int):
+            sizes_by_tool[name].append(size)
+    stats: JSONRecord = {}
+    for name, sizes in sorted(sizes_by_tool.items(), key=lambda item: -sum(item[1])):
+        total = sum(sizes)
+        stats[name] = {
+            "count": len(sizes),
+            "total_bytes": total,
+            "avg_bytes": round(total / len(sizes)),
+            "max_bytes": max(sizes),
+        }
+    return stats

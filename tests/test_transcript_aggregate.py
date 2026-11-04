@@ -3,6 +3,7 @@ from agent_retro.transcript_aggregate import (
     add_assistant_usage,
     empty_token_totals,
     estimated_cost,
+    result_size_bytes,
 )
 
 
@@ -39,3 +40,16 @@ def test_cost_preserves_claude_pricing_and_other_agent_null() -> None:
     expected_cost = 110.25
     assert estimated_cost(totals) == expected_cost
     assert estimated_cost(totals, "codex") is None
+
+
+def test_result_sizes_cover_text_blocks_binary_data_and_structured_values() -> None:
+    assert result_size_bytes("привет") == len("привет".encode())
+    blocks = [
+        {"text": "é"},
+        {"data": "abcd"},
+        "plain",
+        {"ignored": True},
+    ]
+    expected_size = len("é".encode()) + len("abcd") + len("plain")
+    assert result_size_bytes(blocks) == expected_size
+    assert result_size_bytes({"ok": True}) == len('{"ok": true}')
