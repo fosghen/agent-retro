@@ -5,9 +5,10 @@ from __future__ import annotations
 import json
 from collections.abc import Iterable, Iterator, Mapping  # noqa: TC003 -- public types
 from datetime import datetime
+from pathlib import Path  # noqa: TC003 -- public input type
 from typing import Any
 
-from agent_retro.transcript_io import JSONRecord  # noqa: TC001 -- public return type
+from agent_retro.transcript_io import JSONRecord, read_head_tail
 
 
 def extract_json_field(text: str, key: str) -> str | None:
@@ -121,3 +122,24 @@ def _first_claude_prompt(head: str) -> str | None:
 def _duration_seconds(start_time: object, end_time: object) -> int | None:
     start, end = parse_timestamp(start_time), parse_timestamp(end_time)
     return round((end - start).total_seconds()) if start and end else None
+
+
+def extract_metadata_lite(path: str | Path) -> JSONRecord:
+    """Extract Claude or Codex metadata using bounded head and tail reads."""
+    head, tail, size = read_head_tail(path)
+    if any(item.get("type") == "session_meta" for item in buffered_jsonl_records(head)):
+        return codex_metadata_lite(head, tail, size)
+    start_time = extract_json_field(head, "timestamp")
+    end_time = _last_timestamp(tail)
+    return {
+        "session_id": extract_json_field(head, "sessionId"),
+        "cwd": extract_json_field(head, "cwd"),
+        "git_branch": extract_json_field(head, "gitBranch"),
+        "version": extract_json_field(head, "version"),
+        "start_time": start_time,
+        "end_time": end_time,
+        "duration_seconds": _duration_seconds(start_time, end_time),
+        "file_size_bytes": size,
+        "first_prompt": _first_claude_prompt(head),
+        "agent": "claude",
+    }
