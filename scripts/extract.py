@@ -37,6 +37,7 @@ from agent_retro.transcript_metadata import (
 )
 from agent_retro.transcript_normalize import stream_normalized_jsonl as stream_jsonl
 from agent_retro.transcript_subagents import discover_subagents, project_agents
+from agent_retro.transcript_subagents import nearest_dispatch
 
 SCHEMA_VERSION = "0.1.0"
 
@@ -349,7 +350,6 @@ def _extract_agents(tool_calls, subagents_dir=None):
 
 def _match_subagent_files(agents, subagents_dir):
     """Match subagent JSONL files to dispatches using timestamp proximity."""
-    MAX_MATCH_WINDOW_S = 60
     subagent_info = discover_subagents(subagents_dir)
 
     # Match by timestamp proximity
@@ -359,21 +359,9 @@ def _match_subagent_files(agents, subagents_dir):
     for sa_idx, sa in enumerate(subagent_info):
         if not sa["start_time"]:
             continue
-        best_match = None
-        best_delta = None
-
-        for ag_idx, agent in enumerate(agents):
-            if ag_idx in matched_dispatches:
-                continue
-            dispatch_time = parse_ts(agent["timestamp"])
-            if not dispatch_time:
-                continue
-            delta = abs((sa["start_time"] - dispatch_time).total_seconds())
-            if delta <= MAX_MATCH_WINDOW_S and (best_delta is None or delta < best_delta):
-                best_match = ag_idx
-                best_delta = delta
-
-        if best_match is not None:
+        match = nearest_dispatch(agents, sa, matched_dispatches)
+        if match is not None:
+            best_match, best_delta = match
             agents[best_match]["tokens"] = sa["tokens"]
             agents[best_match]["estimated_cost_usd"] = sa["cost"]
             agents[best_match]["subagent_file"] = sa["file"]

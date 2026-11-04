@@ -82,9 +82,10 @@ def project_agents(tool_calls: Iterable[Mapping[str, Any]]) -> list[JSONRecord]:
     return agents
 
 
-def _nearest_dispatch(
+def nearest_dispatch(
     agents: list[JSONRecord], subagent: SubagentInfo, matched: set[int]
 ) -> tuple[int, float] | None:
+    """Find the closest unmatched dispatch inside the matching window."""
     start_time = subagent["start_time"]
     if start_time is None:
         return None
@@ -106,7 +107,7 @@ def match_subagents(agents: list[JSONRecord], subagents: list[SubagentInfo]) -> 
     matched_dispatches: set[int] = set()
     matched_subagents: set[int] = set()
     for subagent_index, subagent in enumerate(subagents):
-        match = _nearest_dispatch(agents, subagent, matched_dispatches)
+        match = nearest_dispatch(agents, subagent, matched_dispatches)
         if match is None:
             continue
         dispatch_index, delta = match
