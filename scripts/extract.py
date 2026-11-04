@@ -13,7 +13,6 @@ Use --metadata-only for cheap session verification (head/tail read only).
 import json
 import sys
 import os
-import glob
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -37,6 +36,7 @@ from agent_retro.transcript_metadata import (
     parse_timestamp as parse_ts,
 )
 from agent_retro.transcript_normalize import stream_normalized_jsonl as stream_jsonl
+from agent_retro.transcript_subagents import discover_subagents
 
 SCHEMA_VERSION = "0.1.0"
 
@@ -365,39 +365,8 @@ def _extract_agents(tool_calls, subagents_dir=None):
 
 def _match_subagent_files(agents, subagents_dir):
     """Match subagent JSONL files to dispatches using timestamp proximity."""
-    subagent_files = sorted(glob.glob(os.path.join(subagents_dir, "*.jsonl")))
     MAX_MATCH_WINDOW_S = 60
-
-    subagent_info = []
-    for sa_file in subagent_files:
-        sa_tokens = empty_token_totals()
-        sa_start = None
-        turn_count = 0
-
-        for rec in stream_jsonl(sa_file):
-            msg = rec.get("message", {})
-            usage = msg.get("usage", {})
-            if add_assistant_usage(sa_tokens, msg.get("role"), usage):
-                turn_count += 1
-            if sa_start is None and "timestamp" in rec:
-                sa_start = parse_ts(rec["timestamp"])
-
-        sa_cost = estimated_cost(sa_tokens) or 0.0
-
-        # Load meta file if present
-        meta = None
-        meta_file = sa_file.replace(".jsonl", ".meta.json")
-        if os.path.exists(meta_file):
-            with open(meta_file) as f:
-                meta = json.load(f)
-
-        subagent_info.append({
-            "file": os.path.basename(sa_file),
-            "tokens": sa_tokens,
-            "cost": round(sa_cost, 4),
-            "start_time": sa_start,
-            "meta": meta,
-        })
+    subagent_info = discover_subagents(subagents_dir)
 
     # Match by timestamp proximity
     matched_dispatches = set()
