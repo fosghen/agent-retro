@@ -6,9 +6,13 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from agent_retro.transcript_aggregate import empty_token_totals, result_size_bytes
-from agent_retro.transcript_conversation import assistant_arc_item
-from agent_retro.transcript_session import empty_session
+from agent_retro.transcript_aggregate import (
+    add_assistant_usage,
+    empty_token_totals,
+    result_size_bytes,
+)
+from agent_retro.transcript_conversation import assistant_arc_item, user_arc_item
+from agent_retro.transcript_session import empty_session, record_session
 from agent_retro.transcript_tools import record_tool_activity, tool_call_summary
 
 if TYPE_CHECKING:
@@ -54,3 +58,24 @@ def _process_block(state: StreamState, block: JSONRecord, role: object, timestam
         item = assistant_arc_item(block, role, timestamp)
         if item is not None:
             state.arc.append(item)
+
+
+def process_record(state: StreamState, record: JSONRecord) -> None:
+    """Accumulate one normalized transcript record."""
+    record_session(state.session, record)
+    branch = record.get("gitBranch")
+    if isinstance(branch, str):
+        state.branches.add(branch)
+    timestamp = record.get("timestamp")
+    message = record.get("message") or {}
+    role = message.get("role")
+    content = message.get("content", "")
+    if add_assistant_usage(state.tokens, role, message.get("usage")):
+        state.turn_count += 1
+    if isinstance(content, list):
+        for block in content:
+            if isinstance(block, dict):
+                _process_block(state, block, role, timestamp)
+    user_item = user_arc_item(content, role, timestamp)
+    if user_item is not None:
+        state.arc.append(user_item)
