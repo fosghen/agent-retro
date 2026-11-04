@@ -69,3 +69,30 @@ def tool_call_summary(block: Mapping[str, Any], timestamp: object) -> JSONRecord
     }
     summary.update(_primary_fields(name, tool_input) or _secondary_fields(name, tool_input))
     return summary
+
+
+def record_tool_activity(
+    call: JSONRecord,
+    tool_input: Mapping[str, Any],
+    files: dict[str, set[str]],
+    commits: list[JSONRecord],
+    prs: list[JSONRecord],
+) -> None:
+    """Record file and git activity for one projected tool call."""
+    name = call.get("name")
+    file_path = tool_input.get("file_path")
+    categories = {"Read": "read", "Write": "written", "Edit": "edited"}
+    if isinstance(name, str) and isinstance(file_path, str) and file_path:
+        category = categories.get(name)
+        if category is not None:
+            files.setdefault(category, set()).add(file_path)
+    if name not in {"Bash", "exec", "exec_command"}:
+        return
+    command = tool_input.get("command")
+    if not isinstance(command, str):
+        return
+    activity = {"command": command[:200], "timestamp": call.get("timestamp")}
+    if "git commit" in command:
+        commits.append(activity)
+    if "gh pr" in command:
+        prs.append(activity)
