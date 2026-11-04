@@ -42,6 +42,7 @@ from agent_retro.transcript_metadata import (
 from agent_retro.transcript_normalize import stream_normalized_jsonl as stream_jsonl
 from agent_retro.transcript_subagents import discover_subagents, project_agents
 from agent_retro.transcript_subagents import match_subagents
+from agent_retro.transcript_tools import tool_call_summary
 
 SCHEMA_VERSION = "0.1.0"
 
@@ -136,38 +137,7 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
                     tool_counts[name] += 1
                     total_tool_calls += 1
 
-                    call_summary = {
-                        "name": name,
-                        "timestamp": ts,
-                        "tool_use_id": block.get("id", ""),
-                    }
-
-                    if name == "Agent":
-                        call_summary["agent_description"] = tool_input.get("description", "")
-                        call_summary["agent_type"] = tool_input.get("subagent_type", "")
-                        call_summary["agent_model"] = tool_input.get("model", "")
-                        call_summary["agent_prompt_preview"] = tool_input.get("prompt", "")[:300]
-                        call_summary["run_in_background"] = tool_input.get("run_in_background", False)
-                    elif name == "Skill":
-                        call_summary["skill_name"] = tool_input.get("skill", "")
-                        call_summary["skill_args"] = tool_input.get("args", "")
-                    elif name in ("Bash", "exec", "exec_command"):
-                        call_summary["command"] = tool_input.get("command", "")[:300]
-                    elif name in ("Read", "Write", "Edit"):
-                        call_summary["file_path"] = tool_input.get("file_path", "")
-                    elif name in ("Grep", "Glob"):
-                        call_summary["pattern"] = tool_input.get("pattern", "")
-                    elif name in ("TaskCreate", "TaskUpdate", "TaskList", "TaskOutput"):
-                        call_summary["task_detail"] = {
-                            k: v for k, v in tool_input.items()
-                            if k in ("description", "status", "id")
-                        }
-                    elif name == "AskUserQuestion":
-                        questions = tool_input.get("questions", [])
-                        call_summary["questions"] = [q.get("question", "") for q in questions]
-                    elif name.startswith("mcp__"):
-                        call_summary["mcp_inputs_preview"] = json.dumps(tool_input)[:300]
-
+                    call_summary = tool_call_summary(block, ts)
                     tool_calls.append(call_summary)
 
                     # Track files
