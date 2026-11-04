@@ -77,7 +77,6 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
     files = state.files
 
     for rec in stream_jsonl(jsonl_path):
-        # --- Session metadata ---
         record_session(session, rec)
         branch = rec.get("gitBranch")
         if isinstance(branch, str):
@@ -89,11 +88,9 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
         content = msg.get("content", "")
         usage = msg.get("usage", {})
 
-        # --- Token usage (assistant messages only) ---
         if add_assistant_usage(tokens_total, role, usage):
             turn_count += 1
 
-        # --- Process content blocks ---
         if isinstance(content, list):
             for block in content:
                 if not isinstance(block, dict):
@@ -101,7 +98,6 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
 
                 block_type = block.get("type")
 
-                # Tool use blocks (assistant calling tools)
                 if block_type == "tool_use":
                     name = block.get("name", "unknown")
                     tool_input = block.get("input", {})
@@ -110,13 +106,11 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
                     tool_calls.append(call_summary)
                     record_tool_activity(call_summary, tool_input, files, commits, prs)
 
-                # Tool result blocks — capture SIZE only, not content
                 elif block_type == "tool_result":
                     tool_use_id = block.get("tool_use_id", "")
                     if tool_use_id:
                         tool_result_sizes[tool_use_id] = result_size_bytes(block.get("content", ""))
 
-                # Text blocks — conversation arc (both assistant AND user)
                 elif block_type == "text":
                     item = assistant_arc_item(block, role, ts)
                     if item is not None:
