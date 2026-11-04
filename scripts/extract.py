@@ -20,9 +20,11 @@ from agent_retro.transcript_aggregate import (
     PRICE_PER_M,
     PRICING_LAST_VERIFIED,
     add_assistant_usage,
+    attach_result_sizes,
     empty_token_totals,
     estimated_cost,
     result_size_bytes,
+    result_size_stats,
 )
 from agent_retro.transcript_io import (
     LITE_READ_BUF_SIZE,
@@ -244,27 +246,8 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
     # Compute cost
     cost = estimated_cost(tokens_total, transcript_format)
 
-    # Attach result sizes to tool calls
-    for call in tool_calls:
-        tid = call.get("tool_use_id", "")
-        if tid in tool_result_sizes:
-            call["result_size_bytes"] = tool_result_sizes[tid]
-
-    # Compute tool result size stats
-    result_size_stats = {}
-    if tool_result_sizes:
-        sizes_by_tool = defaultdict(list)
-        for call in tool_calls:
-            if "result_size_bytes" in call:
-                sizes_by_tool[call["name"]].append(call["result_size_bytes"])
-
-        for tool_name, sizes in sorted(sizes_by_tool.items(), key=lambda x: -sum(x[1])):
-            result_size_stats[tool_name] = {
-                "count": len(sizes),
-                "total_bytes": sum(sizes),
-                "avg_bytes": round(sum(sizes) / len(sizes)),
-                "max_bytes": max(sizes),
-            }
+    attach_result_sizes(tool_calls, tool_result_sizes)
+    result_size_summary = result_size_stats(tool_calls)
 
     # Extract agents
     agents = _extract_agents(tool_calls, subagents_dir)
@@ -301,7 +284,7 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
         },
         "files": {k: sorted(v) for k, v in files.items()},
         "conversation_arc": arc,
-        "tool_result_sizes": result_size_stats,
+        "tool_result_sizes": result_size_summary,
     }
 
     if summary_mode:
