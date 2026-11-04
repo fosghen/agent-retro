@@ -14,6 +14,8 @@ from agent_retro.transcript_aggregate import (
 from agent_retro.transcript_metadata import parse_timestamp
 from agent_retro.transcript_normalize import stream_normalized_jsonl
 
+MAX_MATCH_WINDOW_S = 60
+
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
     from datetime import datetime
@@ -78,3 +80,22 @@ def project_agents(tool_calls: Iterable[Mapping[str, Any]]) -> list[JSONRecord]:
             agent["result_size_bytes"] = call["result_size_bytes"]
         agents.append(agent)
     return agents
+
+
+def _nearest_dispatch(
+    agents: list[JSONRecord], subagent: SubagentInfo, matched: set[int]
+) -> tuple[int, float] | None:
+    start_time = subagent["start_time"]
+    if start_time is None:
+        return None
+    best: tuple[int, float] | None = None
+    for index, agent in enumerate(agents):
+        if index in matched:
+            continue
+        dispatch_time = parse_timestamp(agent.get("timestamp"))
+        if dispatch_time is None:
+            continue
+        delta = abs((start_time - dispatch_time).total_seconds())
+        if delta <= MAX_MATCH_WINDOW_S and (best is None or delta < best[1]):
+            best = index, delta
+    return best
