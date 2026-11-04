@@ -6,8 +6,10 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from agent_retro.transcript_aggregate import empty_token_totals
+from agent_retro.transcript_aggregate import empty_token_totals, result_size_bytes
+from agent_retro.transcript_conversation import assistant_arc_item
 from agent_retro.transcript_session import empty_session
+from agent_retro.transcript_tools import record_tool_activity, tool_call_summary
 
 if TYPE_CHECKING:
     from agent_retro.transcript_aggregate import TokenTotals
@@ -34,3 +36,21 @@ class StreamState:
 def new_stream_state(agent: str) -> StreamState:
     """Create empty state for one detected transcript format."""
     return StreamState(session=empty_session(agent))
+
+
+def _process_block(state: StreamState, block: JSONRecord, role: object, timestamp: object) -> None:
+    block_type = block.get("type")
+    if block_type == "tool_use":
+        tool_input = block.get("input") or {}
+        call = tool_call_summary(block, timestamp)
+        state.tool_calls.append(call)
+        record_tool_activity(call, tool_input, state.files, state.commits, state.prs)
+    elif block_type == "tool_result":
+        tool_use_id = block.get("tool_use_id")
+        if isinstance(tool_use_id, str) and tool_use_id:
+            content = block.get("content", "")
+            state.tool_result_sizes[tool_use_id] = result_size_bytes(content)
+    elif block_type == "text":
+        item = assistant_arc_item(block, role, timestamp)
+        if item is not None:
+            state.arc.append(item)
