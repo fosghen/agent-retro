@@ -41,6 +41,7 @@ from agent_retro.transcript_metadata import (
 )
 from agent_retro.transcript_normalize import stream_normalized_jsonl as stream_jsonl
 from agent_retro.transcript_session import empty_session, finalize_session, record_session
+from agent_retro.transcript_stream import new_stream_state, process_record
 from agent_retro.transcript_subagents import discover_subagents, project_agents
 from agent_retro.transcript_subagents import match_subagents
 from agent_retro.transcript_tools import (
@@ -63,29 +64,17 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
 
     transcript_format = detect_transcript_format(jsonl_path)
 
-    # Session metadata
-    session = empty_session(transcript_format)
-
-    # Token totals
-    tokens_total = empty_token_totals()
+    state = new_stream_state(transcript_format)
+    session = state.session
+    tokens_total = state.tokens
     turn_count = 0
-
-    # Tool tracking
-    tool_calls = []
-
-    # Tool result sizes (tool_use_id -> size in bytes)
-    tool_result_sizes = {}
-
-    # Conversation arc
-    arc = []
-
-    # Git tracking
-    branches = set()
-    commits = []
-    prs = []
-
-    # File tracking
-    files = defaultdict(set)
+    tool_calls = state.tool_calls
+    tool_result_sizes = state.tool_result_sizes
+    arc = state.arc
+    branches = state.branches
+    commits = state.commits
+    prs = state.prs
+    files = state.files
 
     for rec in stream_jsonl(jsonl_path):
         # --- Session metadata ---
