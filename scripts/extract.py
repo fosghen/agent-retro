@@ -40,6 +40,7 @@ from agent_retro.transcript_metadata import (
     parse_timestamp as parse_ts,
 )
 from agent_retro.transcript_normalize import stream_normalized_jsonl as stream_jsonl
+from agent_retro.transcript_session import empty_session, finalize_session, record_session
 from agent_retro.transcript_subagents import discover_subagents, project_agents
 from agent_retro.transcript_subagents import match_subagents
 from agent_retro.transcript_tools import (
@@ -63,17 +64,7 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
     transcript_format = detect_transcript_format(jsonl_path)
 
     # Session metadata
-    session = {
-        "session_id": None,
-        "cwd": None,
-        "git_branch": None,
-        "version": None,
-        "start_time": None,
-        "end_time": None,
-        "duration_seconds": None,
-        "branches_seen": set(),
-        "agent": transcript_format,
-    }
+    session = empty_session(transcript_format)
 
     # Token totals
     tokens_total = empty_token_totals()
@@ -98,23 +89,11 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
 
     for rec in stream_jsonl(jsonl_path):
         # --- Session metadata ---
-        if rec.get("sessionId") and not session["session_id"]:
-            session["session_id"] = rec["sessionId"]
-        if rec.get("cwd") and not session["cwd"]:
-            session["cwd"] = rec["cwd"]
-        if rec.get("gitBranch"):
-            if not session["git_branch"]:
-                session["git_branch"] = rec["gitBranch"]
-            session["branches_seen"].add(rec["gitBranch"])
-            branches.add(rec["gitBranch"])
-        if rec.get("version") and not session["version"]:
-            session["version"] = rec["version"]
-
+        record_session(session, rec)
+        branch = rec.get("gitBranch")
+        if isinstance(branch, str):
+            branches.add(branch)
         ts = rec.get("timestamp")
-        if ts:
-            if not session["start_time"]:
-                session["start_time"] = ts
-            session["end_time"] = ts
 
         msg = rec.get("message", {})
         role = msg.get("role")
@@ -160,13 +139,7 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
 
     # --- Post-processing ---
 
-    # Compute duration
-    if session["start_time"] and session["end_time"]:
-        start = parse_ts(session["start_time"])
-        end = parse_ts(session["end_time"])
-        if start and end:
-            session["duration_seconds"] = round((end - start).total_seconds())
-    session["branches_seen"] = sorted(session["branches_seen"])
+    finalize_session(session)
 
     # Compute cost
     cost = estimated_cost(tokens_total, transcript_format)
