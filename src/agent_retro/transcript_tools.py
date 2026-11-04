@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import json
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
     from typing import Any
 
     from agent_retro.transcript_io import JSONRecord
@@ -32,3 +33,39 @@ def _primary_fields(name: str, tool_input: Mapping[str, Any]) -> JSONRecord:
     elif name in {"Grep", "Glob"}:
         fields["pattern"] = tool_input.get("pattern", "")
     return fields
+
+
+def _secondary_fields(name: str, tool_input: Mapping[str, Any]) -> JSONRecord:
+    if name in {"TaskCreate", "TaskUpdate", "TaskList", "TaskOutput"}:
+        return {
+            "task_detail": {
+                key: value
+                for key, value in tool_input.items()
+                if key in {"description", "status", "id"}
+            }
+        }
+    if name == "AskUserQuestion":
+        questions = tool_input.get("questions", [])
+        return {
+            "questions": [
+                item.get("question", "") for item in questions if isinstance(item, Mapping)
+            ]
+        }
+    if name.startswith("mcp__"):
+        return {"mcp_inputs_preview": json.dumps(tool_input)[:PREVIEW_LIMIT]}
+    return {}
+
+
+def tool_call_summary(block: Mapping[str, Any], timestamp: object) -> JSONRecord:
+    """Project one tool-use block into the stable call summary schema."""
+    raw_name = block.get("name", "unknown")
+    name = raw_name if isinstance(raw_name, str) else "unknown"
+    raw_input = block.get("input", {})
+    tool_input = raw_input if isinstance(raw_input, Mapping) else {}
+    summary: JSONRecord = {
+        "name": name,
+        "timestamp": timestamp,
+        "tool_use_id": block.get("id", ""),
+    }
+    summary.update(_primary_fields(name, tool_input) or _secondary_fields(name, tool_input))
+    return summary
