@@ -26,6 +26,7 @@ from agent_retro.transcript_aggregate import (
     result_size_bytes,
     result_size_stats,
 )
+from agent_retro.transcript_conversation import assistant_arc_item, user_arc_item
 from agent_retro.transcript_io import (
     LITE_READ_BUF_SIZE,
     detect_transcript_format,
@@ -195,43 +196,13 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
 
                 # Text blocks — conversation arc (both assistant AND user)
                 elif block_type == "text":
-                    text = block.get("text", "").strip()
-                    if role == "assistant" and text and len(text) > 20:
-                        arc.append({
-                            "role": "assistant",
-                            "text": text[:1000],
-                            "timestamp": ts,
-                        })
+                    item = assistant_arc_item(block, role, ts)
+                    if item is not None:
+                        arc.append(item)
 
-            # After processing all blocks in a list-format user message,
-            # collect text blocks into the arc
-            if role == "user" and isinstance(content, list):
-                user_text = ""
-                for block in content:
-                    if isinstance(block, dict) and block.get("type") == "text":
-                        user_text += block.get("text", "")
-                    elif isinstance(block, str):
-                        user_text += block
-                user_text = user_text.strip()
-                if user_text and not _is_injected_user_text(user_text):
-                    arc.append({
-                        "role": "user",
-                        "text": user_text[:2000],
-                        "timestamp": ts,
-                    })
-
-        # User messages with string content (simple format)
-        elif role == "user":
-            text = ""
-            if isinstance(content, str):
-                text = content
-            text = text.strip()
-            if text and not _is_injected_user_text(text):
-                arc.append({
-                    "role": "user",
-                    "text": text[:2000],
-                    "timestamp": ts,
-                })
+        user_item = user_arc_item(content, role, ts)
+        if user_item is not None:
+            arc.append(user_item)
 
     # --- Post-processing ---
 
