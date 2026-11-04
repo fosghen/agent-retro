@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
@@ -69,3 +70,55 @@ def tool_call_summary(block: Mapping[str, Any], timestamp: object) -> JSONRecord
     }
     summary.update(_primary_fields(name, tool_input) or _secondary_fields(name, tool_input))
     return summary
+
+
+def record_tool_activity(
+    call: JSONRecord,
+    tool_input: Mapping[str, Any],
+    files: dict[str, set[str]],
+    commits: list[JSONRecord],
+    prs: list[JSONRecord],
+) -> None:
+    """Record file and git activity for one projected tool call."""
+    name = call.get("name")
+    file_path = tool_input.get("file_path")
+    categories = {"Read": "read", "Write": "written", "Edit": "edited"}
+    if isinstance(name, str) and isinstance(file_path, str) and file_path:
+        category = categories.get(name)
+        if category is not None:
+            files.setdefault(category, set()).add(file_path)
+    if name not in {"Bash", "exec", "exec_command"}:
+        return
+    command = tool_input.get("command")
+    if not isinstance(command, str):
+        return
+    activity = {"command": command[:200], "timestamp": call.get("timestamp")}
+    if "git commit" in command:
+        commits.append(activity)
+    if "gh pr" in command:
+        prs.append(activity)
+
+
+def skill_summaries(tool_calls: list[JSONRecord]) -> list[JSONRecord]:
+    """Project Skill calls into the stable top-level skill schema."""
+    return [
+        {
+            "name": call.get("skill_name", ""),
+            "args": call.get("skill_args", ""),
+            "timestamp": call.get("timestamp"),
+        }
+        for call in tool_calls
+        if call.get("name") == "Skill"
+    ]
+
+
+def tool_result_view(tool_calls: list[JSONRecord], *, summary: bool) -> JSONRecord:
+    """Build deterministic summary or full tool output."""
+    counts = Counter(str(call.get("name", "unknown")) for call in tool_calls)
+    result: JSONRecord = {
+        "counts": dict(counts.most_common()),
+        "total_calls": len(tool_calls),
+    }
+    if not summary:
+        result["calls"] = tool_calls
+    return result
