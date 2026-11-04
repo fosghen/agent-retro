@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 from agent_retro.transcript_aggregate import (
     add_assistant_usage,
@@ -15,9 +15,11 @@ from agent_retro.transcript_metadata import parse_timestamp
 from agent_retro.transcript_normalize import stream_normalized_jsonl
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
     from datetime import datetime
 
     from agent_retro.transcript_aggregate import TokenTotals
+    from agent_retro.transcript_io import JSONRecord
 
 
 class SubagentInfo(TypedDict):
@@ -53,3 +55,26 @@ def load_subagent(path: Path) -> SubagentInfo:
 def discover_subagents(directory: str | Path) -> list[SubagentInfo]:
     """Load subagent transcripts in deterministic filename order."""
     return [load_subagent(path) for path in sorted(Path(directory).glob("*.jsonl"))]
+
+
+def project_agents(tool_calls: Iterable[Mapping[str, Any]]) -> list[JSONRecord]:
+    """Project Agent tool calls into the stable result schema."""
+    agents = []
+    for call in tool_calls:
+        if call.get("name") != "Agent":
+            continue
+        agent = {
+            "description": call.get("agent_description", ""),
+            "type": call.get("agent_type", "") or "general-purpose",
+            "model": call.get("agent_model", "") or "inherited",
+            "prompt_preview": call.get("agent_prompt_preview", ""),
+            "background": call.get("run_in_background", False),
+            "timestamp": call.get("timestamp"),
+            "tool_use_id": call.get("tool_use_id", ""),
+            "tokens": None,
+            "estimated_cost_usd": None,
+        }
+        if "result_size_bytes" in call:
+            agent["result_size_bytes"] = call["result_size_bytes"]
+        agents.append(agent)
+    return agents

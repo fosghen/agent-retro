@@ -36,7 +36,7 @@ from agent_retro.transcript_metadata import (
     parse_timestamp as parse_ts,
 )
 from agent_retro.transcript_normalize import stream_normalized_jsonl as stream_jsonl
-from agent_retro.transcript_subagents import discover_subagents
+from agent_retro.transcript_subagents import discover_subagents, project_agents
 
 SCHEMA_VERSION = "0.1.0"
 
@@ -339,23 +339,7 @@ def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
 
 def _extract_agents(tool_calls, subagents_dir=None):
     """Extract agent dispatch details and match with subagent JSONL files."""
-    agents = []
-    for call in tool_calls:
-        if call["name"] == "Agent":
-            agent = {
-                "description": call.get("agent_description", ""),
-                "type": call.get("agent_type", "") or "general-purpose",
-                "model": call.get("agent_model", "") or "inherited",
-                "prompt_preview": call.get("agent_prompt_preview", ""),
-                "background": call.get("run_in_background", False),
-                "timestamp": call.get("timestamp"),
-                "tool_use_id": call.get("tool_use_id", ""),
-                "tokens": None,
-                "estimated_cost_usd": None,
-            }
-            if "result_size_bytes" in call:
-                agent["result_size_bytes"] = call["result_size_bytes"]
-            agents.append(agent)
+    agents = project_agents(tool_calls)
 
     if subagents_dir and os.path.isdir(subagents_dir):
         _match_subagent_files(agents, subagents_dir)
