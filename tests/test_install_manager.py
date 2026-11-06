@@ -1,8 +1,12 @@
+import subprocess
 from pathlib import Path
 
 import pytest
 
 from scripts.install_manager import InstallError, install, uninstall
+
+ROOT = Path(__file__).resolve().parents[1]
+INPUT_ERROR = 2
 
 
 def repository(tmp_path: Path) -> Path:
@@ -52,3 +56,16 @@ def test_uninstall_removes_managed_files_but_preserves_state(tmp_path: Path) -> 
     assert not (home / ".codex/skills/agent-retro").exists()
     assert not (home / ".local/bin/agent-retro").exists()
     assert state.exists()
+
+
+def test_shell_entrypoint_loads_from_any_directory(tmp_path: Path) -> None:
+    result = subprocess.run(  # noqa: S603 -- fixed test entrypoint
+        ["/bin/sh", str(ROOT / "scripts/install_launchd.sh"), "invalid"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == INPUT_ERROR
+    assert result.stderr == "Usage: manage_install.py {install|uninstall}\n"
