@@ -12,15 +12,9 @@ Use --metadata-only for cheap session verification (head/tail read only).
 
 import json
 import sys
-import os
 from pathlib import Path
 
-from agent_retro.transcript_aggregate import (
-    PRICING_LAST_VERIFIED,
-    attach_result_sizes,
-    estimated_cost,
-    result_size_stats,
-)
+from agent_retro.transcript_aggregate import PRICING_LAST_VERIFIED
 from agent_retro.transcript_io import (
     LITE_READ_BUF_SIZE,
     detect_transcript_format,
@@ -31,15 +25,6 @@ from agent_retro.transcript_metadata import (
     extract_json_field,
     extract_metadata_lite as _typed_metadata_lite,
 )
-from agent_retro.transcript_normalize import stream_normalized_jsonl as stream_jsonl
-from agent_retro.transcript_session import finalize_session
-from agent_retro.transcript_stream import new_stream_state, process_record
-from agent_retro.transcript_subagents import discover_subagents, project_agents
-from agent_retro.transcript_subagents import match_subagents
-from agent_retro.transcript_tools import (
-    skill_summaries,
-    tool_result_view,
-)
 from agent_retro.transcript_result import extract_transcript
 
 
@@ -49,38 +34,9 @@ def extract_metadata_lite(path):
 
 
 def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
-    """Main extraction pipeline using streaming — processes line-by-line."""
+    """Delegate the legacy API to the typed extraction entry point."""
 
-    transcript_format = detect_transcript_format(jsonl_path)
-
-    state = new_stream_state(transcript_format)
-    session = state.session
-    tokens_total = state.tokens
-    turn_count = 0
-    tool_calls = state.tool_calls
-    tool_result_sizes = state.tool_result_sizes
-    arc = state.arc
-    branches = state.branches
-    commits = state.commits
-    prs = state.prs
-    files = state.files
-
-    for rec in stream_jsonl(jsonl_path):
-        process_record(state, rec)
-    turn_count = state.turn_count
-
-    # --- Post-processing ---
-
-    finalize_session(session)
-
-    # Compute cost
-    cost = estimated_cost(tokens_total, transcript_format)
-
-    attach_result_sizes(tool_calls, tool_result_sizes)
-    result_size_summary = result_size_stats(tool_calls)
-
-    # Extract agents
-    agents = _extract_agents(tool_calls, subagents_dir)
+    return extract_transcript(jsonl_path, subagents_dir=subagents_dir, summary=summary_mode)
 
     # Warn if agents exist but have no cost data (subagents_dir missing)
     agents_without_cost = [a for a in agents if a.get("estimated_cost_usd") is None
