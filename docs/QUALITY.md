@@ -18,7 +18,8 @@ local configured checks.
 ## Gaps observed
 
 - Ruff formatting and linting are not enforced ([#9](https://github.com/fosghen/agent-retro/issues/9)).
-- Strict mypy is not enforced ([#10](https://github.com/fosghen/agent-retro/issues/10)).
+- Strict mypy covers the application and deterministic scripts through the shared
+  publication gate used by pre-push and CI.
 - There is no single local gate or verified hook bootstrap
   ([#13](https://github.com/fosghen/agent-retro/issues/13)).
 - `main` has no branch protection or required `quality` status check
@@ -31,7 +32,7 @@ must expose one setup command and one local command that CI also uses. Remaining
 work includes:
 
 1. Ruff format and lint ([#9](https://github.com/fosghen/agent-retro/issues/9));
-2. strict mypy ([#10](https://github.com/fosghen/agent-retro/issues/10));
+2. strict mypy across application and deterministic scripts ([#10](https://github.com/fosghen/agent-retro/issues/10));
 3. shell and plist syntax, package build, clean-environment install, and official
    skill validation.
 

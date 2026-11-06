@@ -39,12 +39,17 @@ USAGE = (
 )
 
 
-def extract_metadata_lite(path):
+def extract_metadata_lite(path: str | Path) -> dict[str, object]:
     """Extract bounded session metadata through the typed compatibility boundary."""
     return _typed_metadata_lite(path)
 
 
-def extract_all_streaming(jsonl_path, subagents_dir=None, *, summary_mode=False):
+def extract_all_streaming(
+    jsonl_path: str | Path,
+    subagents_dir: str | Path | None = None,
+    *,
+    summary_mode: bool = False,
+) -> dict[str, object]:
     """Delegate the legacy API to the typed extraction entry point."""
     return extract_transcript(jsonl_path, subagents_dir=subagents_dir, summary=summary_mode)
 

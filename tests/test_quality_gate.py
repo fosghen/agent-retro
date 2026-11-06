@@ -12,7 +12,7 @@ class QualityGateTests(unittest.TestCase):
         self.assertEqual(result[0][-2:], ("python", "scripts/check_agent_config.py"))
         self.assertEqual(result[1][-2:], ("python", "scripts/check_ruff.py"))
         self.assertEqual(result[2][-1], "pytest")
-        self.assertEqual(result[3][-3:], ("mypy", "--strict", "src/agent_retro"))
+        self.assertEqual(result[3][-4:], ("mypy", "--strict", "src/agent_retro", "scripts"))
         self.assertEqual(result[-1][-2:], ("agent-retro", "--help"))
         self.assertTrue(all("--frozen" in item and "--no-sync" in item for item in result))
 
