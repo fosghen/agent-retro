@@ -1,7 +1,9 @@
 """Contract tests for the deterministic agnix quality gate."""
 
 import subprocess
+import sys
 from pathlib import Path
+from shutil import copytree, ignore_patterns
 from unittest.mock import patch
 
 from scripts import check_agent_config
@@ -16,10 +18,30 @@ def test_gate_runs_strict_codex_validation() -> None:
     with patch.object(subprocess, "run") as run:
         check_agent_config.main()
 
-    run.assert_called_once_with(
-        ["agnix", "--strict", "--target", "codex", "."],
-        check=True,
+    run.assert_called_once()
+    command = run.call_args.args[0]
+    assert command[:4] == ["agnix", "--strict", "--target", "codex"]
+    assert Path(command[4]).name == "agent-retro"
+    assert run.call_args.kwargs == {"check": True}
+
+
+def test_gate_is_independent_of_checkout_basename(tmp_path: Path) -> None:
+    checkout = tmp_path / "not-agent-retro"
+    copytree(
+        ROOT,
+        checkout,
+        ignore=ignore_patterns(".git", ".venv", "__pycache__"),
     )
+
+    result = subprocess.run(
+        [sys.executable, "scripts/check_agent_config.py"],
+        cwd=checkout,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_agnix_is_exactly_pinned() -> None:
