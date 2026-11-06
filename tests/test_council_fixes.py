@@ -71,10 +71,7 @@ class TestFix1ListFormatUserMessages(unittest.TestCase):
                     [
                         {
                             "type": "text",
-                            "text": (
-                                "list format message with correction: no, "
-                                "do it differently"
-                            ),
+                            "text": ("list format message with correction: no, do it differently"),
                         }
                     ],
                     "2026-04-06T14:00:10Z",
@@ -91,27 +88,31 @@ class TestFix1ListFormatUserMessages(unittest.TestCase):
                 stream.writelines(json.dumps(line) + "\n" for line in lines)
 
         cls.result = extract.extract_all_streaming(str(cls.fixture))
-        cls.arc_user_texts = [m["text"] for m in cls.result["conversation_arc"]
-                              if m["role"] == "user"]
+        cls.arc_user_texts = [
+            m["text"] for m in cls.result["conversation_arc"] if m["role"] == "user"
+        ]
 
     def test_list_format_text_captured(self):
         """User text in list-format content MUST appear in arc."""
         self.assertTrue(
             any("list format" in t for t in self.arc_user_texts),
-            f"List-format user text not in arc. Got: {self.arc_user_texts}"
+            f"List-format user text not in arc. Got: {self.arc_user_texts}",
         )
 
     def test_mixed_content_text_captured(self):
         """User text mixed with tool_result in list content MUST appear in arc."""
         self.assertTrue(
             any("mixed content" in t or "wait, stop" in t for t in self.arc_user_texts),
-            f"Mixed-content user text not in arc. Got: {self.arc_user_texts}"
+            f"Mixed-content user text not in arc. Got: {self.arc_user_texts}",
         )
 
     def test_all_three_user_messages_captured(self):
         """All user messages with text should be in the arc (string + list + mixed)."""
-        self.assertEqual(len(self.arc_user_texts), 3,
-                         f"Expected 3 user messages, got {len(self.arc_user_texts)}: {self.arc_user_texts}")
+        self.assertEqual(
+            len(self.arc_user_texts),
+            3,
+            f"Expected 3 user messages, got {len(self.arc_user_texts)}: {self.arc_user_texts}",
+        )
 
     def test_tool_result_only_message_excluded(self):
         """User messages containing ONLY tool_result blocks (no text) should NOT be in arc."""
