@@ -5,6 +5,9 @@ local configured checks.
 
 ## Current enforcement
 
+- The shared gate validates the skill with the pinned `skills-ref` reference CLI,
+  builds a wheel, installs it in a fresh environment, and runs that installed
+  CLI. `agnix` and repository-specific contract tests remain separate checks.
 - Pull-request CI rejects more than five commits, commits over 50 changed lines,
   binary changes, and changes made directly on a protected branch name.
 - CI installs the locked Python 3.12 development environment, runs pytest with
@@ -32,9 +35,7 @@ must expose one setup command and one local command that CI also uses. Remaining
 work includes:
 
 1. Ruff format and lint ([#9](https://github.com/fosghen/agent-retro/issues/9));
-2. strict mypy across application and deterministic scripts ([#10](https://github.com/fosghen/agent-retro/issues/10));
-3. shell and plist syntax, package build, clean-environment install, and official
-   skill validation.
+2. strict mypy across application and deterministic scripts ([#10](https://github.com/fosghen/agent-retro/issues/10)).
 
 Suppressions must remain narrow and justified. New checks must fix causes rather
 than weaken thresholds to hide existing violations.

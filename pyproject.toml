@@ -24,7 +24,15 @@ dev = [
     "pytest>=8.3,<10",
     "pytest-cov>=6,<8",
     "ruff>=0.11,<1",
+    "skills-ref",
 ]
+
+[tool.uv.sources]
+
+[tool.uv.sources.skills-ref]
+git = "https://github.com/agentskills/agentskills"
+rev = "83021e2be457a9b6679148719c1f6074f0ad975e"
+subdirectory = "skills-ref"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/agent_retro"]
