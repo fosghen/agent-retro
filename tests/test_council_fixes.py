@@ -190,7 +190,7 @@ class TestFix3_PricingStalenessWarning(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # Fix 4: extract_json_field handles escaped quotes
 # ---------------------------------------------------------------------------
-class TestFix4_EscapedQuotesInJsonField(unittest.TestCase):
+class TestFix4EscapedQuotesInJsonField(unittest.TestCase):
     """extract_json_field must handle escaped quotes in values correctly."""
 
     def test_simple_value(self):
@@ -201,8 +201,11 @@ class TestFix4_EscapedQuotesInJsonField(unittest.TestCase):
         """Value containing escaped quotes must be fully extracted."""
         text = r'"text":"She said \"hello\" to me"'
         result = extract.extract_json_field(text, "text")
-        self.assertEqual(result, r'She said \"hello\" to me',
-                         f"Escaped quotes not handled correctly, got: {result}")
+        self.assertEqual(
+            result,
+            r'She said \"hello\" to me',
+            f"Escaped quotes not handled correctly, got: {result}",
+        )
 
     def test_escaped_backslash_before_quote(self):
         r"""Value with \\ before a quote: the quote terminates the value."""
