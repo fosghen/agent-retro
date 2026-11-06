@@ -137,12 +137,8 @@ class TestFix2ArcTruncationRaised(unittest.TestCase):
             {"message": {"role": "user", "content": long_msg},
              "timestamp": "2026-04-06T15:00:00Z"},
         ]
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
-            for line in lines:
-                f.write(json.dumps(line) + "\n")
-            f.flush()
-            result = extract.extract_all_streaming(f.name)
-        os.unlink(f.name)
+        with temporary_jsonl(lines) as path:
+            result = extract.extract_all_streaming(str(path))
         user_msgs = [m for m in result["conversation_arc"] if m["role"] == "user"]
         self.assertGreater(len(user_msgs[0]["text"]), 500,
                            "User message truncated to <=500 chars — limit should be raised")
@@ -155,12 +151,8 @@ class TestFix2ArcTruncationRaised(unittest.TestCase):
                          "content": [{"type": "text", "text": long_text}]},
              "timestamp": "2026-04-06T15:00:10Z"},
         ]
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
-            for line in lines:
-                f.write(json.dumps(line) + "\n")
-            f.flush()
-            result = extract.extract_all_streaming(f.name)
-        os.unlink(f.name)
+        with temporary_jsonl(lines) as path:
+            result = extract.extract_all_streaming(str(path))
         asst_msgs = [m for m in result["conversation_arc"] if m["role"] == "assistant"]
         self.assertGreater(len(asst_msgs[0]["text"]), 300,
                            "Assistant message truncated to <=300 chars — limit should be raised")
