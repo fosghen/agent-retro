@@ -30,6 +30,11 @@ import extract  # noqa: E402
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 
 
+def user_event(content, timestamp):
+    """Build one synthetic user event."""
+    return {"message": {"role": "user", "content": content}, "timestamp": timestamp}
+
+
 @contextmanager
 def temporary_jsonl(lines):
     """Write JSONL input and remove it after the caller finishes."""
@@ -61,15 +66,26 @@ class TestFix1ListFormatUserMessages(unittest.TestCase):
         # Ensure fixture exists (created by TestKnownBugListContentUserMessages)
         if not cls.fixture.exists():
             lines = [
-                {"message": {"role": "user", "content": "string format message"},
-                 "timestamp": "2026-04-06T14:00:00Z"},
-                {"message": {"role": "user", "content": [
-                    {"type": "text", "text": "list format message with correction: no, do it differently"}
-                ]}, "timestamp": "2026-04-06T14:00:10Z"},
-                {"message": {"role": "user", "content": [
-                    {"type": "text", "text": "mixed content message: wait, stop"},
-                    {"type": "tool_result", "tool_use_id": "tu_y", "content": "result"}
-                ]}, "timestamp": "2026-04-06T14:00:30Z"},
+                user_event("string format message", "2026-04-06T14:00:00Z"),
+                user_event(
+                    [
+                        {
+                            "type": "text",
+                            "text": (
+                                "list format message with correction: no, "
+                                "do it differently"
+                            ),
+                        }
+                    ],
+                    "2026-04-06T14:00:10Z",
+                ),
+                user_event(
+                    [
+                        {"type": "text", "text": "mixed content message: wait, stop"},
+                        {"type": "tool_result", "tool_use_id": "tu_y", "content": "result"},
+                    ],
+                    "2026-04-06T14:00:30Z",
+                ),
             ]
             with cls.fixture.open("w") as stream:
                 stream.writelines(json.dumps(line) + "\n" for line in lines)
@@ -100,9 +116,10 @@ class TestFix1ListFormatUserMessages(unittest.TestCase):
     def test_tool_result_only_message_excluded(self):
         """User messages containing ONLY tool_result blocks (no text) should NOT be in arc."""
         lines = [
-            {"message": {"role": "user", "content": [
-                {"type": "tool_result", "tool_use_id": "tu_z", "content": "just a result"}
-            ]}, "timestamp": "2026-04-06T14:00:40Z"},
+            user_event(
+                [{"type": "tool_result", "tool_use_id": "tu_z", "content": "just a result"}],
+                "2026-04-06T14:00:40Z",
+            ),
         ]
         with temporary_jsonl(lines) as path:
             result = extract.extract_all_streaming(str(path))
@@ -112,9 +129,10 @@ class TestFix1ListFormatUserMessages(unittest.TestCase):
     def test_system_reminder_in_list_filtered(self):
         """System reminders in list-format should still be filtered."""
         lines = [
-            {"message": {"role": "user", "content": [
-                {"type": "text", "text": "<system-reminder>Auto mode active</system-reminder>"}
-            ]}, "timestamp": "2026-04-06T14:00:50Z"},
+            user_event(
+                [{"type": "text", "text": "<system-reminder>Auto mode active</system-reminder>"}],
+                "2026-04-06T14:00:50Z",
+            ),
         ]
         with temporary_jsonl(lines) as path:
             result = extract.extract_all_streaming(str(path))
