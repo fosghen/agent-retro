@@ -15,11 +15,10 @@ Fixes addressed:
 
 import io
 import json
-import os
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stderr
+from contextlib import contextmanager, redirect_stderr
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -29,6 +28,18 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import extract  # noqa: E402
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
+
+
+@contextmanager
+def temporary_jsonl(lines):
+    """Write JSONL input and remove it after the caller finishes."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as stream:
+        stream.writelines(json.dumps(line) + "\n" for line in lines)
+        path = Path(stream.name)
+    try:
+        yield path
+    finally:
+        path.unlink()
 
 
 # ---------------------------------------------------------------------------
@@ -60,9 +71,8 @@ class TestFix1ListFormatUserMessages(unittest.TestCase):
                     {"type": "tool_result", "tool_use_id": "tu_y", "content": "result"}
                 ]}, "timestamp": "2026-04-06T14:00:30Z"},
             ]
-            with open(cls.fixture, "w") as f:
-                for line in lines:
-                    f.write(json.dumps(line) + "\n")
+            with cls.fixture.open("w") as stream:
+                stream.writelines(json.dumps(line) + "\n" for line in lines)
 
         cls.result = extract.extract_all_streaming(str(cls.fixture))
         cls.arc_user_texts = [m["text"] for m in cls.result["conversation_arc"]
@@ -94,12 +104,8 @@ class TestFix1ListFormatUserMessages(unittest.TestCase):
                 {"type": "tool_result", "tool_use_id": "tu_z", "content": "just a result"}
             ]}, "timestamp": "2026-04-06T14:00:40Z"},
         ]
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
-            for line in lines:
-                f.write(json.dumps(line) + "\n")
-            f.flush()
-            result = extract.extract_all_streaming(f.name)
-        os.unlink(f.name)
+        with temporary_jsonl(lines) as path:
+            result = extract.extract_all_streaming(str(path))
         user_msgs = [m for m in result["conversation_arc"] if m["role"] == "user"]
         self.assertEqual(len(user_msgs), 0, "tool_result-only message should not appear in arc")
 
@@ -110,12 +116,8 @@ class TestFix1ListFormatUserMessages(unittest.TestCase):
                 {"type": "text", "text": "<system-reminder>Auto mode active</system-reminder>"}
             ]}, "timestamp": "2026-04-06T14:00:50Z"},
         ]
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
-            for line in lines:
-                f.write(json.dumps(line) + "\n")
-            f.flush()
-            result = extract.extract_all_streaming(f.name)
-        os.unlink(f.name)
+        with temporary_jsonl(lines) as path:
+            result = extract.extract_all_streaming(str(path))
         user_msgs = [m for m in result["conversation_arc"] if m["role"] == "user"]
         self.assertEqual(len(user_msgs), 0, "system-reminder in list format should be filtered")
 
@@ -134,12 +136,8 @@ class TestFix2ArcTruncationRaised(unittest.TestCase):
             {"message": {"role": "user", "content": long_msg},
              "timestamp": "2026-04-06T15:00:00Z"},
         ]
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
-            for line in lines:
-                f.write(json.dumps(line) + "\n")
-            f.flush()
-            result = extract.extract_all_streaming(f.name)
-        os.unlink(f.name)
+        with temporary_jsonl(lines) as path:
+            result = extract.extract_all_streaming(str(path))
         user_msgs = [m for m in result["conversation_arc"] if m["role"] == "user"]
         self.assertGreater(len(user_msgs[0]["text"]), 500,
                            "User message truncated to <=500 chars — limit should be raised")
@@ -152,12 +150,8 @@ class TestFix2ArcTruncationRaised(unittest.TestCase):
                          "content": [{"type": "text", "text": long_text}]},
              "timestamp": "2026-04-06T15:00:10Z"},
         ]
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
-            for line in lines:
-                f.write(json.dumps(line) + "\n")
-            f.flush()
-            result = extract.extract_all_streaming(f.name)
-        os.unlink(f.name)
+        with temporary_jsonl(lines) as path:
+            result = extract.extract_all_streaming(str(path))
         asst_msgs = [m for m in result["conversation_arc"] if m["role"] == "assistant"]
         self.assertGreater(len(asst_msgs[0]["text"]), 300,
                            "Assistant message truncated to <=300 chars — limit should be raised")
@@ -248,15 +242,11 @@ class TestFix5SubagentDirWarning(unittest.TestCase):
              ], "usage": {"input_tokens": 0, "output_tokens": 100,
                           "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0}}},
         ]
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
-            for line in lines:
-                f.write(json.dumps(line) + "\n")
-            f.flush()
+        with temporary_jsonl(lines) as path:
             # Capture stderr
             stderr_capture = io.StringIO()
             with redirect_stderr(stderr_capture):
-                result = extract.extract_all_streaming(f.name, subagents_dir=None)
-        os.unlink(f.name)
+                result = extract.extract_all_streaming(str(path), subagents_dir=None)
         # Should have at least one agent with no cost data
         agents_without_cost = [a for a in result["agents"] if a["estimated_cost_usd"] is None]
         if agents_without_cost:
@@ -275,12 +265,8 @@ class TestFix6SchemaVersion(unittest.TestCase):
         lines = [
             {"sessionId": "test", "timestamp": "2026-04-06T15:00:00Z"},
         ]
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
-            for line in lines:
-                f.write(json.dumps(line) + "\n")
-            f.flush()
-            result = extract.extract_all_streaming(f.name)
-        os.unlink(f.name)
+        with temporary_jsonl(lines) as path:
+            result = extract.extract_all_streaming(str(path))
         self.assertIn("schema_version", result,
                        "Output missing schema_version field")
 
@@ -288,12 +274,8 @@ class TestFix6SchemaVersion(unittest.TestCase):
         lines = [
             {"sessionId": "test", "timestamp": "2026-04-06T15:00:00Z"},
         ]
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
-            for line in lines:
-                f.write(json.dumps(line) + "\n")
-            f.flush()
-            result = extract.extract_all_streaming(f.name)
-        os.unlink(f.name)
+        with temporary_jsonl(lines) as path:
+            result = extract.extract_all_streaming(str(path))
         self.assertIsInstance(result.get("schema_version"), str)
 
 
