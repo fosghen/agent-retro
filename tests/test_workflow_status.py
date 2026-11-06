@@ -3,7 +3,14 @@ import subprocess
 import unittest
 from unittest.mock import patch
 
-from scripts.workflow_status import WorkflowStatusError, collect, encode, execute, main
+from scripts.workflow_status import (
+    WorkflowStatusError,
+    collect,
+    encode,
+    execute,
+    main,
+    require_publication_ready,
+)
 
 RESPONSES = {
     ("git", "branch", "--show-current"): "feature/issue-102-status",
@@ -32,6 +39,41 @@ def query(tool: str, *args: str) -> str:
 
 
 class WorkflowStatusTests(unittest.TestCase):
+    def test_publication_requires_clean_committed_work(self) -> None:
+        cases = (
+            ({("git", "status", "--porcelain"): " M file.py"}, "clean worktree"),
+            (
+                {
+                    ("git", "status", "--porcelain"): "",
+                    ("git", "rev-list", "--reverse", "origin/main..HEAD"): "",
+                },
+                "at least one commit",
+            ),
+        )
+        for responses, message in cases:
+            with (
+                self.subTest(message=message),
+                self.assertRaisesRegex(WorkflowStatusError, message),
+            ):
+                require_publication_ready(
+                    "feature/issue-102-status",
+                    lambda tool, *args, responses=responses: responses[(tool, *args)],
+                )
+
+        responses = {
+            ("git", "status", "--porcelain"): "",
+            ("git", "rev-list", "--reverse", "origin/main..HEAD"): "abc",
+            ("git", "show", "--format=", "--numstat", "abc"): "51\t0\tfile.py",
+        }
+        with self.assertRaisesRegex(WorkflowStatusError, "51 changed lines"):
+            require_publication_ready(
+                "feature/issue-102-status", lambda tool, *args: responses[(tool, *args)]
+            )
+        responses[("git", "show", "--format=", "--numstat", "abc")] = "25\t25\tfile.py"
+        require_publication_ready(
+            "feature/issue-102-status", lambda tool, *args: responses[(tool, *args)]
+        )
+
     def test_collects_compact_issue_first_state_and_budgets(self) -> None:
         status = collect(query)
         self.assertEqual(status["issue"], {"number": 102, "state": "OPEN"})
@@ -77,7 +119,7 @@ class WorkflowStatusTests(unittest.TestCase):
         ):
             execute("gh", "issue")
         with patch("scripts.workflow_status.collect", side_effect=WorkflowStatusError("offline")):
-            self.assertEqual(main(), 1)
+            self.assertEqual(main([]), 1)
 
     def test_deterministic_efficiency_proxy(self) -> None:
         status = collect(query)
