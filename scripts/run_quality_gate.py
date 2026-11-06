@@ -12,9 +12,9 @@ def commands(uv: str) -> tuple[tuple[str, ...], ...]:
     """Return the single authoritative full-gate command sequence."""
     prefix = (uv, "run", "--frozen", "--no-sync")
     return (
+        (*prefix, "python", "scripts/check_agent_config.py"),
         (*prefix, "python", "scripts/check_shell_plist.py"),
         (*prefix, "python", "scripts/check_package.py"),
-        (*prefix, "python", "scripts/check_agent_config.py"),
         (*prefix, "python", "scripts/check_ruff.py"),
         (*prefix, "pytest"),
         (*prefix, "mypy", "--strict", "src/agent_retro", "scripts"),
