@@ -20,6 +20,8 @@ from scripts.check_change_limits import (
     check,
     count_lines,
 )
+from scripts.check_issue_state import IssueStateError
+from scripts.check_issue_state import check as check_issue_state
 
 ISSUE_BRANCH = re.compile(r"(?:^|/)issue-([1-9][0-9]*)(?:-|$)")
 Query = Callable[..., str]
@@ -76,9 +78,10 @@ def collect(query: Query = execute, *, publication: bool = False) -> dict[str, o
     changed = count_lines(query("git", "diff", "--numstat", "origin/main...HEAD"))
     staged = count_lines(query("git", "diff", "--cached", "--numstat"))
     issue = json.loads(query("gh", "issue", "view", str(issue_number), "--json", "number,state"))
-    if issue.get("number") != issue_number:
-        message = f"issue #{issue_number} is absent"
-        raise WorkflowStatusError(message)
+    try:
+        check_issue_state(issue_number, json.dumps(issue))
+    except IssueStateError as error:
+        raise WorkflowStatusError(str(error)) from error
     pull_requests = json.loads(
         query(
             "gh",
