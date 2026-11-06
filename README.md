@@ -4,6 +4,11 @@
 
 A local-first Codex application and skill for session retrospectives. Invoke `agent-retro` (or ask Codex for a session retrospective) to analyze what happened, identify friction, and get concrete suggestions for improving your skills, rules, and workflows.
 
+Agent-authored pull requests publish delivery time, verification, review and
+available exact usage through
+[`agent-delivery-telemetry`](https://github.com/fosghen/agent-delivery-telemetry#readme).
+Repository instructions define when the workflow is mandatory.
+
 Follows the [Agent Skills](https://agentskills.io) open standard.
 
 ## What it does

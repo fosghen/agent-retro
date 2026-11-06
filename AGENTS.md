@@ -51,3 +51,17 @@ never bypass configured hooks with `--no-verify`.
 Treat commits, pushes, pull request mutations, merges, and issue mutations as
 separate authorization boundaries. Keep reports concise and distinguish observed
 results from assumptions or planned work.
+
+## Delivery telemetry
+
+Agent-authored issue work must use
+[`agent-delivery-telemetry`](https://github.com/fosghen/agent-delivery-telemetry#readme).
+Run `begin` after `workflow_status` and before editing. Route each controlled
+non-interactive `codex exec --json` run through `capture-codex-usage`; never
+retain its raw event stream. After the exact head passes the quality gate, run
+`finish`, bind every captured run, and publish the owned `adt:v1` comment to the
+pull request. Run `report` after merge.
+
+Telemetry does not replace issue-first, TDD, review judgment, or required gates.
+Never invent exact token usage for an interactive or uninstrumented run; preserve
+it as unavailable. The tool README is the canonical command reference.
