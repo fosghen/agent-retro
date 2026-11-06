@@ -1,6 +1,7 @@
 import unittest
+from unittest.mock import patch
 
-from scripts.check_pr_process import ProcessDeclarationError, check
+from scripts.check_pr_process import ProcessDeclarationError, check, main
 
 TRIGGERS = """\
 - [ ] data migration or persisted-schema change
@@ -52,3 +53,10 @@ class PullRequestProcessTests(unittest.TestCase):
                 self.assertRaisesRegex(ProcessDeclarationError, "Closes"),
             ):
                 check(body, branch)
+
+    def test_local_preflight_reads_explicit_body_file(self) -> None:
+        body = f"{ISSUE}Risk: low\nIndependent review: not-used\n{TRIGGERS}"
+        with patch("pathlib.Path.read_text", return_value=body) as read:
+            result = main(["--body-file", "pr.md", "--branch", BRANCH])
+        self.assertEqual(result, 0)
+        read.assert_called_once_with()
