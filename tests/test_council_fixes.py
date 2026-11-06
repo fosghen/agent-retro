@@ -191,8 +191,10 @@ class TestFix3PricingStalenessWarning(unittest.TestCase):
 
     def test_pricing_last_verified_exists(self):
         """extract module must have a PRICING_LAST_VERIFIED constant."""
-        self.assertTrue(hasattr(extract, "PRICING_LAST_VERIFIED"),
-                        "Missing PRICING_LAST_VERIFIED constant in extract.py")
+        self.assertTrue(
+            hasattr(extract, "PRICING_LAST_VERIFIED"),
+            "Missing PRICING_LAST_VERIFIED constant in extract.py",
+        )
 
     def test_pricing_last_verified_is_date_string(self):
         """PRICING_LAST_VERIFIED should be an ISO date string."""
@@ -221,7 +223,7 @@ class TestFix4EscapedQuotesInJsonField(unittest.TestCase):
         result = extract.extract_json_field(text, "text")
         self.assertEqual(
             result,
-            r'She said \"hello\" to me',
+            r"She said \"hello\" to me",
             f"Escaped quotes not handled correctly, got: {result}",
         )
 
