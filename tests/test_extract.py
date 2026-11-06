@@ -822,25 +822,48 @@ class TestKnownBugListContentUserMessages(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Create the list-content fixture inline."""
-        import tempfile, os, json
         cls.fixture_path = FIXTURES_DIR / "user_list_content.jsonl"
 
         lines = [
             # String-format user message (DOES get captured)
-            {"message": {"role": "user", "content": "first message in string format"},
-             "timestamp": "2026-04-06T14:00:00Z"},
+            {
+                "message": {"role": "user", "content": "first message in string format"},
+                "timestamp": "2026-04-06T14:00:00Z",
+            },
             # List-format text block (does NOT get captured — the bug)
-            {"message": {"role": "user", "content": [{"type": "text", "text": "second message in list format — should be captured"}]},
-             "timestamp": "2026-04-06T14:00:10Z"},
+            {
+                "message": {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "second message in list format — should be captured",
+                        }
+                    ],
+                },
+                "timestamp": "2026-04-06T14:00:10Z",
+            },
             # List-format with tool_result (no text, shouldn't be captured)
-            {"message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "tu_x", "content": "some result"}]},
-             "timestamp": "2026-04-06T14:00:20Z"},
+            {
+                "message": {
+                    "role": "user",
+                    "content": [
+                        {"type": "tool_result", "tool_use_id": "tu_x", "content": "some result"}
+                    ],
+                },
+                "timestamp": "2026-04-06T14:00:20Z",
+            },
             # List-format with mixed text+tool_result (text SHOULD be captured but isn't)
-            {"message": {"role": "user", "content": [
-                {"type": "text", "text": "third message with mixed content"},
-                {"type": "tool_result", "tool_use_id": "tu_y", "content": "another result"}
-            ]},
-             "timestamp": "2026-04-06T14:00:30Z"},
+            {
+                "message": {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "third message with mixed content"},
+                        {"type": "tool_result", "tool_use_id": "tu_y", "content": "another result"},
+                    ],
+                },
+                "timestamp": "2026-04-06T14:00:30Z",
+            },
         ]
         with open(cls.fixture_path, "w") as f:
             for line in lines:
