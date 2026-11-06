@@ -15,7 +15,6 @@ Fixes addressed:
 
 import io
 import json
-import os
 import sys
 import tempfile
 import unittest
@@ -266,12 +265,8 @@ class TestFix6SchemaVersion(unittest.TestCase):
         lines = [
             {"sessionId": "test", "timestamp": "2026-04-06T15:00:00Z"},
         ]
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
-            for line in lines:
-                f.write(json.dumps(line) + "\n")
-            f.flush()
-            result = extract.extract_all_streaming(f.name)
-        os.unlink(f.name)
+        with temporary_jsonl(lines) as path:
+            result = extract.extract_all_streaming(str(path))
         self.assertIn("schema_version", result,
                        "Output missing schema_version field")
 
@@ -279,12 +274,8 @@ class TestFix6SchemaVersion(unittest.TestCase):
         lines = [
             {"sessionId": "test", "timestamp": "2026-04-06T15:00:00Z"},
         ]
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
-            for line in lines:
-                f.write(json.dumps(line) + "\n")
-            f.flush()
-            result = extract.extract_all_streaming(f.name)
-        os.unlink(f.name)
+        with temporary_jsonl(lines) as path:
+            result = extract.extract_all_streaming(str(path))
         self.assertIsInstance(result.get("schema_version"), str)
 
 
