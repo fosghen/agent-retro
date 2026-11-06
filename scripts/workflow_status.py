@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import shutil
@@ -16,6 +17,7 @@ from scripts.check_change_limits import (
     MAX_COMMITS,
     MAX_PR_LINES,
     ChangeLimitError,
+    check,
     count_lines,
 )
 
@@ -44,13 +46,31 @@ def execute(tool: str, *args: str) -> str:
     return result.stdout.strip()
 
 
-def collect(query: Query = execute) -> dict[str, object]:
+def require_publication_ready(branch: str, query: Query = execute) -> None:
+    """Reject work that cannot be published as one policy-compliant branch."""
+    if query("git", "status", "--porcelain"):
+        message = "publication requires a clean worktree"
+        raise WorkflowStatusError(message)
+    hashes = query("git", "rev-list", "--reverse", "origin/main..HEAD").splitlines()
+    if not hashes:
+        message = "publication requires at least one commit"
+        raise WorkflowStatusError(message)
+    commits = {item: query("git", "show", "--format=", "--numstat", item) for item in hashes}
+    try:
+        check(branch, commits)
+    except ChangeLimitError as error:
+        raise WorkflowStatusError(str(error)) from error
+
+
+def collect(query: Query = execute, *, publication: bool = False) -> dict[str, object]:
     """Collect local budgets and matching live GitHub state."""
     branch = query("git", "branch", "--show-current")
     match = ISSUE_BRANCH.search(branch)
     if match is None:
         message = "current branch must contain issue-N"
         raise WorkflowStatusError(message)
+    if publication:
+        require_publication_ready(branch, query)
     issue_number = int(match.group(1))
     commits = int(query("git", "rev-list", "--count", "origin/main..HEAD"))
     changed = count_lines(query("git", "diff", "--numstat", "origin/main...HEAD"))
@@ -94,10 +114,13 @@ def encode(status: dict[str, object]) -> str:
     return json.dumps(status, separators=(",", ":"), sort_keys=True)
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     """Print compact status or one actionable error."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--publication", action="store_true")
+    args = parser.parse_args(argv)
     try:
-        print(encode(collect()))  # noqa: T201 -- CLI output
+        print(encode(collect(publication=args.publication)))  # noqa: T201 -- CLI output
     except (ChangeLimitError, ValueError, WorkflowStatusError) as error:
         print(f"workflow status failed: {error}", file=sys.stderr)  # noqa: T201
         return 1
