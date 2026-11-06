@@ -636,22 +636,20 @@ class TestCompactedSession(unittest.TestCase):
 
     def test_arc_contains_compaction_marker(self):
         """The compaction marker message should appear in the arc (it's real user content)."""
-        user_texts = [m["text"] for m in self.result["conversation_arc"]
-                      if m["role"] == "user"]
+        user_texts = [m["text"] for m in self.result["conversation_arc"] if m["role"] == "user"]
         compaction_found = any("Compacted" in t or "compacted" in t for t in user_texts)
-        self.assertTrue(compaction_found,
-                        "Compaction marker not found in conversation arc")
+        self.assertTrue(compaction_found, "Compaction marker not found in conversation arc")
 
     def test_system_reminder_filtered_from_arc(self):
         """<system-reminder> content should not appear as arc entries."""
         for msg in self.result["conversation_arc"]:
-            self.assertFalse(msg["text"].startswith("<system-reminder>"),
-                             f"system-reminder leaked into arc")
+            self.assertFalse(
+                msg["text"].startswith("<system-reminder>"), "system-reminder leaked into arc"
+            )
 
     def test_large_cache_creation_captured(self):
         """The compacted session's first message has a 50K cache_creation_input_tokens spike."""
-        self.assertGreater(
-            self.result["tokens"]["total"]["cache_creation_input_tokens"], 40000)
+        self.assertGreater(self.result["tokens"]["total"]["cache_creation_input_tokens"], 40000)
 
     def test_read_file_tracked(self):
         """Files read after the compaction point should still be tracked."""
@@ -702,7 +700,7 @@ class TestLargeArcSession(unittest.TestCase):
 class TestOutputStructureInvariants(unittest.TestCase):
     """These structural guarantees must hold for every fixture."""
 
-    FIXTURES = [
+    FIXTURES: ClassVar[list[str]] = [
         "full_session.jsonl",
         "empty_session.jsonl",
         "tool_results_only.jsonl",
@@ -710,17 +708,30 @@ class TestOutputStructureInvariants(unittest.TestCase):
         "large_arc_session.jsonl",
     ]
 
-    REQUIRED_TOP_LEVEL_KEYS = [
-        "session", "tokens", "agents", "skills",
-        "git", "files", "conversation_arc", "tool_result_sizes", "tools",
+    REQUIRED_TOP_LEVEL_KEYS: ClassVar[list[str]] = [
+        "session",
+        "tokens",
+        "agents",
+        "skills",
+        "git",
+        "files",
+        "conversation_arc",
+        "tool_result_sizes",
+        "tools",
     ]
 
-    REQUIRED_SESSION_KEYS = [
-        "session_id", "cwd", "git_branch", "version",
-        "start_time", "end_time", "duration_seconds", "branches_seen",
+    REQUIRED_SESSION_KEYS: ClassVar[list[str]] = [
+        "session_id",
+        "cwd",
+        "git_branch",
+        "version",
+        "start_time",
+        "end_time",
+        "duration_seconds",
+        "branches_seen",
     ]
 
-    REQUIRED_TOKEN_KEYS = ["total", "turn_count", "estimated_cost_usd"]
+    REQUIRED_TOKEN_KEYS: ClassVar[list[str]] = ["total", "turn_count", "estimated_cost_usd"]
 
     def test_all_fixtures_have_required_keys(self):
         for fixture in self.FIXTURES:
@@ -763,8 +774,7 @@ class TestOutputStructureInvariants(unittest.TestCase):
     def test_arc_always_list(self):
         for fixture in self.FIXTURES:
             with self.subTest(fixture=fixture):
-                self.assertIsInstance(
-                    load_fixture_result(fixture)["conversation_arc"], list)
+                self.assertIsInstance(load_fixture_result(fixture)["conversation_arc"], list)
 
     def test_cost_always_non_negative(self):
         for fixture in self.FIXTURES:
