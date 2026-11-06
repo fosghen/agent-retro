@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Tests for extract.py — verifies extraction correctness against JSONL fixtures.
 
@@ -12,10 +11,10 @@ so run from the skill root directory (/tmp/claude-code-retro/).
 """
 
 import json
-import os
 import sys
 import unittest
 from pathlib import Path
+from typing import ClassVar
 
 # Allow running from any directory by adding the script's repo root to sys.path
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -23,11 +22,10 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import extract  # noqa: E402
 
-
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 
 
-def load_fixture_result(fixture_name, summary=False, metadata_only=False):
+def load_fixture_result(fixture_name, *, summary=False, metadata_only=False):
     """Run the extractor against a named fixture and return the parsed result."""
     path = str(FIXTURES_DIR / fixture_name)
     if metadata_only:
@@ -68,8 +66,10 @@ class TestMetadataOnly(unittest.TestCase):
         # String-format content → first_prompt is None (metadata-only limitation)
         # This is expected behavior for the current fixture format.
         # If this changes, the metadata-only path was improved — update the assertion.
-        self.assertIsNone(self.meta["first_prompt"],
-                          "Expected None for string-format content — if fixed, update this test")
+        self.assertIsNone(
+            self.meta["first_prompt"],
+            "Expected None for string-format content — if fixed, update this test",
+        )
 
     def test_first_prompt_works_with_text_block_format(self):
         """first_prompt IS extracted when user messages use {"type":"text","text":"..."} format.
@@ -123,22 +123,24 @@ class TestCodexSession(unittest.TestCase):
     def test_metadata_only(self):
         self.assertEqual(self.meta["agent"], "codex")
         self.assertEqual(self.meta["session_id"], "codex-session-123")
-        self.assertEqual(self.meta["cwd"], "/tmp/codex-project")
+        self.assertEqual(
+            self.meta["cwd"],
+            "/tmp/codex-project",  # noqa: S108 - fixture data, not filesystem use.
+        )
         self.assertEqual(self.meta["first_prompt"], "Review yesterday's sessions.")
 
     def test_session_and_messages(self):
         self.assertEqual(self.result["session"]["session_id"], "codex-session-123")
-        assistant = [item for item in self.result["conversation_arc"]
-                     if item["role"] == "assistant"]
+        assistant = [
+            item for item in self.result["conversation_arc"] if item["role"] == "assistant"
+        ]
         self.assertEqual(len(assistant), 2)
-        users = [item["text"] for item in self.result["conversation_arc"]
-                 if item["role"] == "user"]
+        users = [item["text"] for item in self.result["conversation_arc"] if item["role"] == "user"]
         self.assertEqual(users, ["Review yesterday's sessions."])
 
     def test_tool_calls_and_results_are_correlated(self):
         self.assertEqual(self.result["tools"]["counts"]["exec"], 1)
-        call = next(item for item in self.result["tools"]["calls"]
-                    if item["name"] == "exec")
+        call = next(item for item in self.result["tools"]["calls"] if item["name"] == "exec")
         self.assertEqual(call["command"], "git status --short")
         self.assertGreater(call["result_size_bytes"], 0)
 
@@ -197,8 +199,12 @@ class TestTokenUsage(unittest.TestCase):
 
     def test_token_totals_structure(self):
         """All four token fields must be present."""
-        for field in ("input_tokens", "output_tokens",
-                      "cache_creation_input_tokens", "cache_read_input_tokens"):
+        for field in (
+            "input_tokens",
+            "output_tokens",
+            "cache_creation_input_tokens",
+            "cache_read_input_tokens",
+        ):
             self.assertIn(field, self.tokens["total"], f"missing token field: {field}")
 
     def test_output_tokens_nonzero(self):
@@ -257,8 +263,7 @@ class TestToolCalls(unittest.TestCase):
         self.assertEqual(self.counts.get("Skill", 0), 1)
 
     def test_total_calls_sum(self):
-        self.assertEqual(self.result["tools"]["total_calls"],
-                         sum(self.counts.values()))
+        self.assertEqual(self.result["tools"]["total_calls"], sum(self.counts.values()))
 
     def test_summary_mode_omits_call_list(self):
         """In summary mode, individual call listings should be absent."""
@@ -312,15 +317,14 @@ class TestToolResultSizes(unittest.TestCase):
                 self.assertIn(field, stats, f"{tool_name} missing {field}")
 
     def test_sizes_are_non_negative(self):
-        for tool_name, stats in self.sizes.items():
+        for stats in self.sizes.values():
             self.assertGreaterEqual(stats["total_bytes"], 0)
             self.assertGreaterEqual(stats["avg_bytes"], 0)
             self.assertGreaterEqual(stats["max_bytes"], 0)
 
     def test_result_size_attached_to_call(self):
         """Calls with known result IDs should have result_size_bytes populated."""
-        calls_with_size = [c for c in self.result["tools"]["calls"]
-                           if "result_size_bytes" in c]
+        calls_with_size = [c for c in self.result["tools"]["calls"] if "result_size_bytes" in c]
         # Every tool call in the fixture has a result, so at least one should match
         self.assertGreater(len(calls_with_size), 0)
 
@@ -365,7 +369,7 @@ class TestConversationArc(unittest.TestCase):
         for msg in self.arc:
             self.assertFalse(
                 msg["text"].startswith("<system-reminder>"),
-                f"system-reminder leaked into arc: {msg['text'][:50]}"
+                f"system-reminder leaked into arc: {msg['text'][:50]}",
             )
 
     def test_arc_message_has_required_fields(self):
@@ -389,10 +393,12 @@ class TestConversationArc(unittest.TestCase):
     def test_arc_preserves_user_correction(self):
         """The user correction ('wait i also need...') should appear in the arc."""
         user_texts = [m["text"] for m in self.arc if m["role"] == "user"]
-        correction_found = any("validate" in t.lower() or "signature" in t.lower()
-                               for t in user_texts)
-        self.assertTrue(correction_found,
-                        "User correction about signature validation not found in arc")
+        correction_found = any(
+            "validate" in t.lower() or "signature" in t.lower() for t in user_texts
+        )
+        self.assertTrue(
+            correction_found, "User correction about signature validation not found in arc"
+        )
 
     def test_short_assistant_messages_filtered(self):
         """Assistant messages <= 20 chars are filtered (too short to be meaningful)."""
@@ -416,8 +422,15 @@ class TestAgentDispatches(unittest.TestCase):
 
     def test_agent_has_required_fields(self):
         agent = self.agents[0]
-        for field in ("description", "type", "model", "prompt_preview",
-                      "background", "timestamp", "tool_use_id"):
+        for field in (
+            "description",
+            "type",
+            "model",
+            "prompt_preview",
+            "background",
+            "timestamp",
+            "tool_use_id",
+        ):
             self.assertIn(field, agent, f"agent missing field: {field}")
 
     def test_agent_description(self):
@@ -521,8 +534,7 @@ class TestFileTracking(unittest.TestCase):
     def test_files_are_sorted_lists(self):
         """File sets should be serialized as sorted lists."""
         for category, file_list in self.files.items():
-            self.assertIsInstance(file_list, list,
-                                  f"files[{category!r}] is not a list")
+            self.assertIsInstance(file_list, list, f"files[{category!r}] is not a list")
 
 
 # ---------------------------------------------------------------------------
@@ -541,8 +553,12 @@ class TestEmptySession(unittest.TestCase):
         self.assertEqual(self.result["conversation_arc"], [])
 
     def test_token_totals_zero(self):
-        for field in ("input_tokens", "output_tokens",
-                      "cache_creation_input_tokens", "cache_read_input_tokens"):
+        for field in (
+            "input_tokens",
+            "output_tokens",
+            "cache_creation_input_tokens",
+            "cache_read_input_tokens",
+        ):
             self.assertEqual(self.result["tokens"]["total"][field], 0)
 
     def test_no_agents(self):
@@ -595,8 +611,17 @@ class TestToolResultsOnly(unittest.TestCase):
 
     def test_result_structure_intact(self):
         """All top-level keys must be present even when session is nearly empty."""
-        for key in ("session", "tokens", "agents", "skills", "git",
-                    "files", "conversation_arc", "tool_result_sizes", "tools"):
+        for key in (
+            "session",
+            "tokens",
+            "agents",
+            "skills",
+            "git",
+            "files",
+            "conversation_arc",
+            "tool_result_sizes",
+            "tools",
+        ):
             self.assertIn(key, self.result, f"missing key: {key}")
 
 
@@ -611,22 +636,20 @@ class TestCompactedSession(unittest.TestCase):
 
     def test_arc_contains_compaction_marker(self):
         """The compaction marker message should appear in the arc (it's real user content)."""
-        user_texts = [m["text"] for m in self.result["conversation_arc"]
-                      if m["role"] == "user"]
+        user_texts = [m["text"] for m in self.result["conversation_arc"] if m["role"] == "user"]
         compaction_found = any("Compacted" in t or "compacted" in t for t in user_texts)
-        self.assertTrue(compaction_found,
-                        "Compaction marker not found in conversation arc")
+        self.assertTrue(compaction_found, "Compaction marker not found in conversation arc")
 
     def test_system_reminder_filtered_from_arc(self):
         """<system-reminder> content should not appear as arc entries."""
         for msg in self.result["conversation_arc"]:
-            self.assertFalse(msg["text"].startswith("<system-reminder>"),
-                             f"system-reminder leaked into arc")
+            self.assertFalse(
+                msg["text"].startswith("<system-reminder>"), "system-reminder leaked into arc"
+            )
 
     def test_large_cache_creation_captured(self):
         """The compacted session's first message has a 50K cache_creation_input_tokens spike."""
-        self.assertGreater(
-            self.result["tokens"]["total"]["cache_creation_input_tokens"], 40000)
+        self.assertGreater(self.result["tokens"]["total"]["cache_creation_input_tokens"], 40000)
 
     def test_read_file_tracked(self):
         """Files read after the compaction point should still be tracked."""
@@ -677,7 +700,7 @@ class TestLargeArcSession(unittest.TestCase):
 class TestOutputStructureInvariants(unittest.TestCase):
     """These structural guarantees must hold for every fixture."""
 
-    FIXTURES = [
+    FIXTURES: ClassVar[list[str]] = [
         "full_session.jsonl",
         "empty_session.jsonl",
         "tool_results_only.jsonl",
@@ -685,17 +708,30 @@ class TestOutputStructureInvariants(unittest.TestCase):
         "large_arc_session.jsonl",
     ]
 
-    REQUIRED_TOP_LEVEL_KEYS = [
-        "session", "tokens", "agents", "skills",
-        "git", "files", "conversation_arc", "tool_result_sizes", "tools",
+    REQUIRED_TOP_LEVEL_KEYS: ClassVar[list[str]] = [
+        "session",
+        "tokens",
+        "agents",
+        "skills",
+        "git",
+        "files",
+        "conversation_arc",
+        "tool_result_sizes",
+        "tools",
     ]
 
-    REQUIRED_SESSION_KEYS = [
-        "session_id", "cwd", "git_branch", "version",
-        "start_time", "end_time", "duration_seconds", "branches_seen",
+    REQUIRED_SESSION_KEYS: ClassVar[list[str]] = [
+        "session_id",
+        "cwd",
+        "git_branch",
+        "version",
+        "start_time",
+        "end_time",
+        "duration_seconds",
+        "branches_seen",
     ]
 
-    REQUIRED_TOKEN_KEYS = ["total", "turn_count", "estimated_cost_usd"]
+    REQUIRED_TOKEN_KEYS: ClassVar[list[str]] = ["total", "turn_count", "estimated_cost_usd"]
 
     def test_all_fixtures_have_required_keys(self):
         for fixture in self.FIXTURES:
@@ -738,8 +774,7 @@ class TestOutputStructureInvariants(unittest.TestCase):
     def test_arc_always_list(self):
         for fixture in self.FIXTURES:
             with self.subTest(fixture=fixture):
-                self.assertIsInstance(
-                    load_fixture_result(fixture)["conversation_arc"], list)
+                self.assertIsInstance(load_fixture_result(fixture)["conversation_arc"], list)
 
     def test_cost_always_non_negative(self):
         for fixture in self.FIXTURES:
@@ -787,59 +822,85 @@ class TestKnownBugListContentUserMessages(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Create the list-content fixture inline."""
-        import tempfile, os, json
         cls.fixture_path = FIXTURES_DIR / "user_list_content.jsonl"
 
         lines = [
             # String-format user message (DOES get captured)
-            {"message": {"role": "user", "content": "first message in string format"},
-             "timestamp": "2026-04-06T14:00:00Z"},
+            {
+                "message": {"role": "user", "content": "first message in string format"},
+                "timestamp": "2026-04-06T14:00:00Z",
+            },
             # List-format text block (does NOT get captured — the bug)
-            {"message": {"role": "user", "content": [{"type": "text", "text": "second message in list format — should be captured"}]},
-             "timestamp": "2026-04-06T14:00:10Z"},
+            {
+                "message": {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": "second message in list format — should be captured",
+                        }
+                    ],
+                },
+                "timestamp": "2026-04-06T14:00:10Z",
+            },
             # List-format with tool_result (no text, shouldn't be captured)
-            {"message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "tu_x", "content": "some result"}]},
-             "timestamp": "2026-04-06T14:00:20Z"},
+            {
+                "message": {
+                    "role": "user",
+                    "content": [
+                        {"type": "tool_result", "tool_use_id": "tu_x", "content": "some result"}
+                    ],
+                },
+                "timestamp": "2026-04-06T14:00:20Z",
+            },
             # List-format with mixed text+tool_result (text SHOULD be captured but isn't)
-            {"message": {"role": "user", "content": [
-                {"type": "text", "text": "third message with mixed content"},
-                {"type": "tool_result", "tool_use_id": "tu_y", "content": "another result"}
-            ]},
-             "timestamp": "2026-04-06T14:00:30Z"},
+            {
+                "message": {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "third message with mixed content"},
+                        {"type": "tool_result", "tool_use_id": "tu_y", "content": "another result"},
+                    ],
+                },
+                "timestamp": "2026-04-06T14:00:30Z",
+            },
         ]
-        with open(cls.fixture_path, "w") as f:
-            for line in lines:
-                f.write(json.dumps(line) + "\n")
+        with cls.fixture_path.open("w") as f:
+            f.writelines(json.dumps(line) + "\n" for line in lines)
 
         cls.result = extract.extract_all_streaming(str(cls.fixture_path))
-        cls.arc_user_texts = [m["text"] for m in cls.result["conversation_arc"]
-                              if m["role"] == "user"]
+        cls.arc_user_texts = [
+            m["text"] for m in cls.result["conversation_arc"] if m["role"] == "user"
+        ]
 
     def test_string_content_captured(self):
         """User messages in string format ARE captured (this works)."""
         self.assertTrue(
             any("string format" in t for t in self.arc_user_texts),
-            "String-format user message should be in arc"
+            "String-format user message should be in arc",
         )
 
     def test_list_text_block_captured(self):
         """User text blocks in list format are now captured (bug fixed)."""
         self.assertTrue(
             any("list format" in t for t in self.arc_user_texts),
-            "List-format user text should be captured in arc"
+            "List-format user text should be captured in arc",
         )
 
     def test_mixed_content_text_captured(self):
         """User text blocks mixed with tool_result in list content are now captured."""
         self.assertTrue(
             any("mixed content" in t for t in self.arc_user_texts),
-            "Mixed list-format user text should be captured in arc"
+            "Mixed list-format user text should be captured in arc",
         )
 
     def test_all_user_messages_captured(self):
         """All user messages with text should be captured (bug fixed)."""
-        self.assertEqual(len(self.arc_user_texts), 3,
-                         f"Expected 3 user messages, got {len(self.arc_user_texts)}: {self.arc_user_texts}")
+        self.assertEqual(
+            len(self.arc_user_texts),
+            3,
+            f"Expected 3 user messages, got {len(self.arc_user_texts)}: {self.arc_user_texts}",
+        )
 
 
 # ---------------------------------------------------------------------------
