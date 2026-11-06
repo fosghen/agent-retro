@@ -55,6 +55,7 @@ def install(root: Path, home: Path, execute: Execute) -> None:
         "ProgramArguments": [str(python), str(script)],
         "StartCalendarInterval": {"Hour": 9, "Minute": 0},
         "ProcessType": "Background",
+        "EnvironmentVariables": {"PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"},
     }
     plist.write_bytes(plistlib.dumps(payload))
     execute(("launchctl", "bootout", f"{_domain()}/{LABEL}"))
