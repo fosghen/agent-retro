@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import argparse
 import os
 import re
 import sys
+from pathlib import Path
 
 RISK = re.compile(r"(?m)^Risk: (low|high)$")
 REVIEW = re.compile(r"(?m)^Independent review: (not-used|completed)$")
@@ -48,10 +50,24 @@ def check(body: str, branch: str) -> None:
         raise ProcessDeclarationError(message)
 
 
-def main() -> int:
-    """Validate the PR body supplied by GitHub Actions."""
+def inputs(argv: list[str] | None) -> tuple[str, str]:
+    """Read either an explicit local preflight or the CI environment."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--body-file", type=Path)
+    parser.add_argument("--branch")
+    args = parser.parse_args(argv)
+    if args.body_file is None and args.branch is None:
+        return os.environ.get("PR_BODY", ""), os.environ.get("PR_BRANCH", "")
+    if args.body_file is None or args.branch is None:
+        parser.error("--body-file and --branch must be provided together")
+    return args.body_file.read_text(), args.branch
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Validate an explicit draft or the PR body supplied by CI."""
+    body, branch = inputs(argv)
     try:
-        check(os.environ.get("PR_BODY", ""), os.environ.get("PR_BRANCH", ""))
+        check(body, branch)
     except ProcessDeclarationError as error:
         print(f"PR process policy failed: {error}", file=sys.stderr)  # noqa: T201
         return 1
