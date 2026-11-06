@@ -27,16 +27,20 @@ Development must follow this order:
 
 1. Register an issue containing the outcome, acceptance criteria, scope, and
    known risk triggers.
-2. Split it before implementation when the work cannot fit one 250-line PR or
-   contains independently deliverable high-risk components.
+2. Split it before implementation when one coherent commit cannot fit 50 lines,
+   the work cannot fit one 250-line PR, or it contains independently deliverable
+   high-risk components. Never manufacture a post-hoc split of one coherent diff.
 3. Create a branch containing `issue-N`, matching the registered issue number.
 4. Add focused failing tests, implement the smallest coherent change, and use
    focused checks while editing.
 5. Self-review the complete diff. Independent review is not a routine quality
    gate and PR size alone is never a reason to request it.
 6. Run `uv run --frozen --no-sync python scripts/run_quality_gate.py` once after
-   the diff is stable. Repeat it only when code changes after that successful run.
-7. Publish one focused PR whose `Closes #N` matches the branch issue.
+   the diff is stable. This validates content, not Git history. Repeat it only
+   when code changes after that successful run.
+7. Create the logical commits, then run `uv run --frozen --no-sync python -m
+   scripts.workflow_status --publication` on the clean branch.
+8. Push and publish one focused PR whose `Closes #N` matches the branch issue.
 
 Use independent review only when the PR changes persisted schemas or migrations,
 concurrency or transaction boundaries, privacy/security/authentication/
