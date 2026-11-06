@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 TDD tests for council review fixes.
 
@@ -14,12 +13,12 @@ Fixes addressed:
   6. Schema version missing from output
 """
 
+import io
 import json
 import os
 import sys
-import unittest
 import tempfile
-import io
+import unittest
 from contextlib import redirect_stderr
 from pathlib import Path
 
@@ -34,7 +33,7 @@ FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 # ---------------------------------------------------------------------------
 # Fix 1: User messages in list-format content must be captured in arc
 # ---------------------------------------------------------------------------
-class TestFix1_ListFormatUserMessages(unittest.TestCase):
+class TestFix1ListFormatUserMessages(unittest.TestCase):
     """CRITICAL BUG: User text blocks inside list-format content are dropped.
 
     Real Claude Code sessions send user messages as:
@@ -123,7 +122,7 @@ class TestFix1_ListFormatUserMessages(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # Fix 2: Arc truncation limits raised
 # ---------------------------------------------------------------------------
-class TestFix2_ArcTruncationRaised(unittest.TestCase):
+class TestFix2ArcTruncationRaised(unittest.TestCase):
     """Arc truncation at 300/500 chars loses critical context.
     Limits should be raised to at least 1000/2000 chars."""
 
@@ -166,7 +165,7 @@ class TestFix2_ArcTruncationRaised(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # Fix 3: Pricing staleness warning
 # ---------------------------------------------------------------------------
-class TestFix3_PricingStalenessWarning(unittest.TestCase):
+class TestFix3PricingStalenessWarning(unittest.TestCase):
     """Hardcoded pricing should include a last-verified date and the script
     should have a PRICING_LAST_VERIFIED constant."""
 
@@ -235,7 +234,7 @@ class TestFix4EscapedQuotesInJsonField(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # Fix 5: Subagent dir auto-detection warns on failure
 # ---------------------------------------------------------------------------
-class TestFix5_SubagentDirWarning(unittest.TestCase):
+class TestFix5SubagentDirWarning(unittest.TestCase):
     """When subagent dir auto-detection fails, a warning should be emitted to stderr."""
 
     def test_warning_when_no_subagents_dir_found(self):
@@ -269,7 +268,7 @@ class TestFix5_SubagentDirWarning(unittest.TestCase):
 # ---------------------------------------------------------------------------
 # Fix 6: Schema version in output
 # ---------------------------------------------------------------------------
-class TestFix6_SchemaVersion(unittest.TestCase):
+class TestFix6SchemaVersion(unittest.TestCase):
     """Extraction output should include a schema_version field."""
 
     def test_schema_version_present(self):
