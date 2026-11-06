@@ -35,55 +35,7 @@ def extract_metadata_lite(path):
 
 def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
     """Delegate the legacy API to the typed extraction entry point."""
-
     return extract_transcript(jsonl_path, subagents_dir=subagents_dir, summary=summary_mode)
-
-    # Warn if agents exist but have no cost data (subagents_dir missing)
-    agents_without_cost = [a for a in agents if a.get("estimated_cost_usd") is None
-                           and a.get("description") and not a.get("description", "").startswith("[unmatched")]
-    if agents_without_cost:
-        print(f"Warning: {len(agents_without_cost)} agent dispatch(es) have no subagent cost data. "
-              f"Pass --subagents-dir <path> to attribute subagent costs.",
-              file=sys.stderr)
-
-    # Build result
-    result = {
-        "schema_version": SCHEMA_VERSION,
-        "session": session,
-        "tokens": {
-            "total": tokens_total,
-            "turn_count": turn_count,
-            "estimated_cost_usd": round(cost, 4) if cost is not None else None,
-        },
-        "agents": agents,
-        "skills": skill_summaries(tool_calls),
-        "git": {
-            "branches": sorted(branches),
-            "commits": commits,
-            "pr_operations": prs,
-        },
-        "files": {k: sorted(v) for k, v in files.items()},
-        "conversation_arc": arc,
-        "tool_result_sizes": result_size_summary,
-        "tools": tool_result_view(tool_calls, summary=summary_mode),
-    }
-
-    return result
-
-
-def _extract_agents(tool_calls, subagents_dir=None):
-    """Extract agent dispatch details and match with subagent JSONL files."""
-    agents = project_agents(tool_calls)
-
-    if subagents_dir and os.path.isdir(subagents_dir):
-        _match_subagent_files(agents, subagents_dir)
-
-    return agents
-
-
-def _match_subagent_files(agents, subagents_dir):
-    """Match subagent JSONL files to dispatches using timestamp proximity."""
-    match_subagents(agents, discover_subagents(subagents_dir))
 
 
 if __name__ == "__main__":
