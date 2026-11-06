@@ -152,28 +152,34 @@ class TestFix2ArcTruncationRaised(unittest.TestCase):
         """A 1500-char user message should not be truncated to 500."""
         long_msg = "x" * 1500
         lines = [
-            {"message": {"role": "user", "content": long_msg},
-             "timestamp": "2026-04-06T15:00:00Z"},
+            {"message": {"role": "user", "content": long_msg}, "timestamp": "2026-04-06T15:00:00Z"},
         ]
         with temporary_jsonl(lines) as path:
             result = extract.extract_all_streaming(str(path))
         user_msgs = [m for m in result["conversation_arc"] if m["role"] == "user"]
-        self.assertGreater(len(user_msgs[0]["text"]), 500,
-                           "User message truncated to <=500 chars — limit should be raised")
+        self.assertGreater(
+            len(user_msgs[0]["text"]),
+            500,
+            "User message truncated to <=500 chars — limit should be raised",
+        )
 
     def test_long_assistant_message_preserved(self):
         """A 800-char assistant message should not be truncated to 300."""
         long_text = "a" * 800
         lines = [
-            {"message": {"role": "assistant",
-                         "content": [{"type": "text", "text": long_text}]},
-             "timestamp": "2026-04-06T15:00:10Z"},
+            {
+                "message": {"role": "assistant", "content": [{"type": "text", "text": long_text}]},
+                "timestamp": "2026-04-06T15:00:10Z",
+            },
         ]
         with temporary_jsonl(lines) as path:
             result = extract.extract_all_streaming(str(path))
         asst_msgs = [m for m in result["conversation_arc"] if m["role"] == "assistant"]
-        self.assertGreater(len(asst_msgs[0]["text"]), 300,
-                           "Assistant message truncated to <=300 chars — limit should be raised")
+        self.assertGreater(
+            len(asst_msgs[0]["text"]),
+            300,
+            "Assistant message truncated to <=300 chars — limit should be raised",
+        )
 
 
 # ---------------------------------------------------------------------------
