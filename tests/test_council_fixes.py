@@ -243,15 +243,11 @@ class TestFix5SubagentDirWarning(unittest.TestCase):
              ], "usage": {"input_tokens": 0, "output_tokens": 100,
                           "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0}}},
         ]
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
-            for line in lines:
-                f.write(json.dumps(line) + "\n")
-            f.flush()
+        with temporary_jsonl(lines) as path:
             # Capture stderr
             stderr_capture = io.StringIO()
             with redirect_stderr(stderr_capture):
-                result = extract.extract_all_streaming(f.name, subagents_dir=None)
-        os.unlink(f.name)
+                result = extract.extract_all_streaming(str(path), subagents_dir=None)
         # Should have at least one agent with no cost data
         agents_without_cost = [a for a in result["agents"] if a["estimated_cost_usd"] is None]
         if agents_without_cost:
