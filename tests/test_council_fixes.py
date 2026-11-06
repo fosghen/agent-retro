@@ -72,9 +72,8 @@ class TestFix1ListFormatUserMessages(unittest.TestCase):
                     {"type": "tool_result", "tool_use_id": "tu_y", "content": "result"}
                 ]}, "timestamp": "2026-04-06T14:00:30Z"},
             ]
-            with open(cls.fixture, "w") as f:
-                for line in lines:
-                    f.write(json.dumps(line) + "\n")
+            with cls.fixture.open("w") as stream:
+                stream.writelines(json.dumps(line) + "\n" for line in lines)
 
         cls.result = extract.extract_all_streaming(str(cls.fixture))
         cls.arc_user_texts = [m["text"] for m in cls.result["conversation_arc"]
@@ -106,12 +105,8 @@ class TestFix1ListFormatUserMessages(unittest.TestCase):
                 {"type": "tool_result", "tool_use_id": "tu_z", "content": "just a result"}
             ]}, "timestamp": "2026-04-06T14:00:40Z"},
         ]
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
-            for line in lines:
-                f.write(json.dumps(line) + "\n")
-            f.flush()
-            result = extract.extract_all_streaming(f.name)
-        os.unlink(f.name)
+        with temporary_jsonl(lines) as path:
+            result = extract.extract_all_streaming(str(path))
         user_msgs = [m for m in result["conversation_arc"] if m["role"] == "user"]
         self.assertEqual(len(user_msgs), 0, "tool_result-only message should not appear in arc")
 
@@ -122,12 +117,8 @@ class TestFix1ListFormatUserMessages(unittest.TestCase):
                 {"type": "text", "text": "<system-reminder>Auto mode active</system-reminder>"}
             ]}, "timestamp": "2026-04-06T14:00:50Z"},
         ]
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as f:
-            for line in lines:
-                f.write(json.dumps(line) + "\n")
-            f.flush()
-            result = extract.extract_all_streaming(f.name)
-        os.unlink(f.name)
+        with temporary_jsonl(lines) as path:
+            result = extract.extract_all_streaming(str(path))
         user_msgs = [m for m in result["conversation_arc"] if m["role"] == "user"]
         self.assertEqual(len(user_msgs), 0, "system-reminder in list format should be filtered")
 
