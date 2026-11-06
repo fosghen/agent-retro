@@ -20,6 +20,7 @@ import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr
+from datetime import UTC, datetime
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -179,9 +180,8 @@ class TestFix3PricingStalenessWarning(unittest.TestCase):
         verified = getattr(extract, "PRICING_LAST_VERIFIED", None)
         self.assertIsNotNone(verified)
         # Should parse as a date
-        from datetime import datetime
         try:
-            datetime.strptime(verified, "%Y-%m-%d")
+            datetime.strptime(verified, "%Y-%m-%d").replace(tzinfo=UTC)
         except (ValueError, TypeError):
             self.fail(f"PRICING_LAST_VERIFIED is not a valid YYYY-MM-DD date: {verified}")
 
