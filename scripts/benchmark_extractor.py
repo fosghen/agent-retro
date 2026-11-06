@@ -6,7 +6,7 @@ import io
 import json
 import math
 import statistics
-import subprocess
+import subprocess  # nosec B404
 import sys
 import time
 import tracemalloc
@@ -62,7 +62,7 @@ def _startup_ms(repeats: int) -> float:
     samples = []
     for _ in range(repeats):
         started = time.perf_counter()
-        subprocess.run(command, check=True)  # noqa: S603
+        subprocess.run(command, check=True)  # noqa: S603  # nosec B603
         samples.append((time.perf_counter() - started) * 1000)
     return round(statistics.median(samples), 3)
 
