@@ -71,10 +71,7 @@ class TestFix1ListFormatUserMessages(unittest.TestCase):
                     [
                         {
                             "type": "text",
-                            "text": (
-                                "list format message with correction: no, "
-                                "do it differently"
-                            ),
+                            "text": ("list format message with correction: no, do it differently"),
                         }
                     ],
                     "2026-04-06T14:00:10Z",
@@ -91,27 +88,31 @@ class TestFix1ListFormatUserMessages(unittest.TestCase):
                 stream.writelines(json.dumps(line) + "\n" for line in lines)
 
         cls.result = extract.extract_all_streaming(str(cls.fixture))
-        cls.arc_user_texts = [m["text"] for m in cls.result["conversation_arc"]
-                              if m["role"] == "user"]
+        cls.arc_user_texts = [
+            m["text"] for m in cls.result["conversation_arc"] if m["role"] == "user"
+        ]
 
     def test_list_format_text_captured(self):
         """User text in list-format content MUST appear in arc."""
         self.assertTrue(
             any("list format" in t for t in self.arc_user_texts),
-            f"List-format user text not in arc. Got: {self.arc_user_texts}"
+            f"List-format user text not in arc. Got: {self.arc_user_texts}",
         )
 
     def test_mixed_content_text_captured(self):
         """User text mixed with tool_result in list content MUST appear in arc."""
         self.assertTrue(
             any("mixed content" in t or "wait, stop" in t for t in self.arc_user_texts),
-            f"Mixed-content user text not in arc. Got: {self.arc_user_texts}"
+            f"Mixed-content user text not in arc. Got: {self.arc_user_texts}",
         )
 
     def test_all_three_user_messages_captured(self):
         """All user messages with text should be in the arc (string + list + mixed)."""
-        self.assertEqual(len(self.arc_user_texts), 3,
-                         f"Expected 3 user messages, got {len(self.arc_user_texts)}: {self.arc_user_texts}")
+        self.assertEqual(
+            len(self.arc_user_texts),
+            3,
+            f"Expected 3 user messages, got {len(self.arc_user_texts)}: {self.arc_user_texts}",
+        )
 
     def test_tool_result_only_message_excluded(self):
         """User messages containing ONLY tool_result blocks (no text) should NOT be in arc."""
@@ -151,28 +152,34 @@ class TestFix2ArcTruncationRaised(unittest.TestCase):
         """A 1500-char user message should not be truncated to 500."""
         long_msg = "x" * 1500
         lines = [
-            {"message": {"role": "user", "content": long_msg},
-             "timestamp": "2026-04-06T15:00:00Z"},
+            {"message": {"role": "user", "content": long_msg}, "timestamp": "2026-04-06T15:00:00Z"},
         ]
         with temporary_jsonl(lines) as path:
             result = extract.extract_all_streaming(str(path))
         user_msgs = [m for m in result["conversation_arc"] if m["role"] == "user"]
-        self.assertGreater(len(user_msgs[0]["text"]), 500,
-                           "User message truncated to <=500 chars — limit should be raised")
+        self.assertGreater(
+            len(user_msgs[0]["text"]),
+            500,
+            "User message truncated to <=500 chars — limit should be raised",
+        )
 
     def test_long_assistant_message_preserved(self):
         """A 800-char assistant message should not be truncated to 300."""
         long_text = "a" * 800
         lines = [
-            {"message": {"role": "assistant",
-                         "content": [{"type": "text", "text": long_text}]},
-             "timestamp": "2026-04-06T15:00:10Z"},
+            {
+                "message": {"role": "assistant", "content": [{"type": "text", "text": long_text}]},
+                "timestamp": "2026-04-06T15:00:10Z",
+            },
         ]
         with temporary_jsonl(lines) as path:
             result = extract.extract_all_streaming(str(path))
         asst_msgs = [m for m in result["conversation_arc"] if m["role"] == "assistant"]
-        self.assertGreater(len(asst_msgs[0]["text"]), 300,
-                           "Assistant message truncated to <=300 chars — limit should be raised")
+        self.assertGreater(
+            len(asst_msgs[0]["text"]),
+            300,
+            "Assistant message truncated to <=300 chars — limit should be raised",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -184,8 +191,10 @@ class TestFix3PricingStalenessWarning(unittest.TestCase):
 
     def test_pricing_last_verified_exists(self):
         """extract module must have a PRICING_LAST_VERIFIED constant."""
-        self.assertTrue(hasattr(extract, "PRICING_LAST_VERIFIED"),
-                        "Missing PRICING_LAST_VERIFIED constant in extract.py")
+        self.assertTrue(
+            hasattr(extract, "PRICING_LAST_VERIFIED"),
+            "Missing PRICING_LAST_VERIFIED constant in extract.py",
+        )
 
     def test_pricing_last_verified_is_date_string(self):
         """PRICING_LAST_VERIFIED should be an ISO date string."""
@@ -214,7 +223,7 @@ class TestFix4EscapedQuotesInJsonField(unittest.TestCase):
         result = extract.extract_json_field(text, "text")
         self.assertEqual(
             result,
-            r'She said \"hello\" to me',
+            r"She said \"hello\" to me",
             f"Escaped quotes not handled correctly, got: {result}",
         )
 
@@ -253,12 +262,27 @@ class TestFix5SubagentDirWarning(unittest.TestCase):
         """Running extraction with no subagents dir should emit a note to stderr."""
         # Create a minimal fixture
         lines = [
-            {"sessionId": "test", "timestamp": "2026-04-06T15:00:00Z",
-             "message": {"role": "assistant", "content": [
-                 {"type": "tool_use", "id": "tu_agent", "name": "Agent",
-                  "input": {"description": "test", "prompt": "do something"}}
-             ], "usage": {"input_tokens": 0, "output_tokens": 100,
-                          "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0}}},
+            {
+                "sessionId": "test",
+                "timestamp": "2026-04-06T15:00:00Z",
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": "tu_agent",
+                            "name": "Agent",
+                            "input": {"description": "test", "prompt": "do something"},
+                        }
+                    ],
+                    "usage": {
+                        "input_tokens": 0,
+                        "output_tokens": 100,
+                        "cache_creation_input_tokens": 0,
+                        "cache_read_input_tokens": 0,
+                    },
+                },
+            },
         ]
         with temporary_jsonl(lines) as path:
             # Capture stderr
@@ -269,8 +293,11 @@ class TestFix5SubagentDirWarning(unittest.TestCase):
         agents_without_cost = [a for a in result["agents"] if a["estimated_cost_usd"] is None]
         if agents_without_cost:
             stderr_output = stderr_capture.getvalue()
-            self.assertIn("subagent", stderr_output.lower(),
-                          "No stderr warning about missing subagent cost data")
+            self.assertIn(
+                "subagent",
+                stderr_output.lower(),
+                "No stderr warning about missing subagent cost data",
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -285,8 +312,7 @@ class TestFix6SchemaVersion(unittest.TestCase):
         ]
         with temporary_jsonl(lines) as path:
             result = extract.extract_all_streaming(str(path))
-        self.assertIn("schema_version", result,
-                       "Output missing schema_version field")
+        self.assertIn("schema_version", result, "Output missing schema_version field")
 
     def test_schema_version_is_string(self):
         lines = [
