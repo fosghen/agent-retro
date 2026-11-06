@@ -1,4 +1,4 @@
-"""Run Ruff on the maintained Python scope without legacy extractor debt."""
+"""Run Ruff across the complete maintained Python scope."""
 
 from __future__ import annotations
 
@@ -8,15 +8,13 @@ import shutil
 import subprocess  # nosec B404
 
 SCOPE = ("src", "scripts", "tests")
-LEGACY_EXCLUDES = "scripts/extract.py,tests/test_extract.py,tests/test_council_fixes.py"
 
 
 def commands(ruff: str) -> tuple[tuple[str, ...], ...]:
     """Return the shared deterministic Ruff command sequence."""
-    suffix = (*SCOPE, "--exclude", LEGACY_EXCLUDES)
     return (
-        (ruff, "format", "--check", *suffix),
-        (ruff, "check", *suffix),
+        (ruff, "format", "--check", *SCOPE),
+        (ruff, "check", *SCOPE),
     )
 
 

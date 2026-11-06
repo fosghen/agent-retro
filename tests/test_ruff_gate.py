@@ -2,21 +2,19 @@ import subprocess
 import unittest
 from unittest.mock import call, patch
 
-from scripts.check_ruff import LEGACY_EXCLUDES, commands, main
+from scripts.check_ruff import commands, main
 
 
 class RuffGateTests(unittest.TestCase):
-    def test_scope_names_only_legacy_extractor_files(self) -> None:
-        self.assertEqual(
-            LEGACY_EXCLUDES,
-            "scripts/extract.py,tests/test_extract.py,tests/test_council_fixes.py",
-        )
-
     def test_commands_cover_format_and_lint(self) -> None:
         result = commands("/bin/ruff")
-        self.assertEqual(result[0][:3], ("/bin/ruff", "format", "--check"))
-        self.assertEqual(result[1][:2], ("/bin/ruff", "check"))
-        self.assertTrue(all("--exclude" in command for command in result))
+        self.assertEqual(
+            result,
+            (
+                ("/bin/ruff", "format", "--check", "src", "scripts", "tests"),
+                ("/bin/ruff", "check", "src", "scripts", "tests"),
+            ),
+        )
 
     def test_controlled_violation_stops_the_gate(self) -> None:
         with (

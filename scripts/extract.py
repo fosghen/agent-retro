@@ -1,6 +1,4 @@
-#!/usr/bin/env python3
-"""
-Extract structured data from a Claude Code session transcript (JSONL).
+"""Extract structured data from a Claude Code session transcript (JSONL).
 
 Usage:
     python extract.py <session-jsonl-path> [--subagents-dir <path>] [--summary] [--metadata-only]
@@ -21,11 +19,24 @@ from agent_retro.transcript_io import (
     read_head_tail,
     stream_raw_jsonl,
 )
-from agent_retro.transcript_metadata import (
-    extract_json_field,
-    extract_metadata_lite as _typed_metadata_lite,
-)
+from agent_retro.transcript_metadata import extract_json_field
+from agent_retro.transcript_metadata import extract_metadata_lite as _typed_metadata_lite
 from agent_retro.transcript_result import extract_transcript
+
+__all__ = [
+    "LITE_READ_BUF_SIZE",
+    "PRICING_LAST_VERIFIED",
+    "detect_transcript_format",
+    "extract_json_field",
+    "read_head_tail",
+    "stream_raw_jsonl",
+]
+
+MINIMUM_ARGUMENTS = 2
+USAGE = (
+    "Usage: python extract.py <session.jsonl> "
+    "[--subagents-dir <path>] [--summary] [--metadata-only]"
+)
 
 
 def extract_metadata_lite(path):
@@ -33,14 +44,15 @@ def extract_metadata_lite(path):
     return _typed_metadata_lite(path)
 
 
-def extract_all_streaming(jsonl_path, subagents_dir=None, summary_mode=False):
+def extract_all_streaming(jsonl_path, subagents_dir=None, *, summary_mode=False):
     """Delegate the legacy API to the typed extraction entry point."""
     return extract_transcript(jsonl_path, subagents_dir=subagents_dir, summary=summary_mode)
 
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python extract.py <session.jsonl> [--subagents-dir <path>] [--summary] [--metadata-only]")
+def main() -> None:
+    """Extract the transcript selected by command-line arguments."""
+    if len(sys.argv) < MINIMUM_ARGUMENTS:
+        sys.stdout.write(f"{USAGE}\n")
         sys.exit(1)
 
     jsonl_path = sys.argv[1]
@@ -50,7 +62,7 @@ if __name__ == "__main__":
 
     if metadata_only:
         result = extract_metadata_lite(jsonl_path)
-        print(json.dumps(result, indent=2, default=str))
+        sys.stdout.write(f"{json.dumps(result, indent=2, default=str)}\n")
         sys.exit(0)
 
     if "--subagents-dir" in sys.argv:
@@ -64,5 +76,9 @@ if __name__ == "__main__":
         if candidate.is_dir():
             subagents_dir = str(candidate)
 
-    result = extract_all_streaming(jsonl_path, subagents_dir, summary_mode)
-    print(json.dumps(result, indent=2, default=str))
+    result = extract_all_streaming(jsonl_path, subagents_dir, summary_mode=summary_mode)
+    sys.stdout.write(f"{json.dumps(result, indent=2, default=str)}\n")
+
+
+if __name__ == "__main__":
+    main()
