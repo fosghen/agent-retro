@@ -1,7 +1,8 @@
 import json
 import unittest
+from unittest.mock import patch
 
-from scripts.check_issue_state import IssueStateError, check
+from scripts.check_issue_state import IssueStateError, check, main
 
 
 class IssueStateTests(unittest.TestCase):
@@ -16,3 +17,13 @@ class IssueStateTests(unittest.TestCase):
         for payload, message in cases:
             with self.subTest(payload=payload), self.assertRaisesRegex(IssueStateError, message):
                 check(204, json.dumps(payload))
+
+    def test_main_reads_branch_and_fails_closed(self) -> None:
+        with (
+            patch.dict("os.environ", {"HEAD_BRANCH": "fix/issue-204-open"}),
+            patch("scripts.check_issue_state.query") as query,
+        ):
+            query.return_value = '{"number":204,"state":"OPEN"}'
+            self.assertEqual(main(), 0)
+            query.return_value = '{"number":204,"state":"CLOSED"}'
+            self.assertEqual(main(), 1)
