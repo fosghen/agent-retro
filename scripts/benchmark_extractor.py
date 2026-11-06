@@ -1,7 +1,9 @@
 """Reproducible extractor benchmark over synthetic repository fixtures."""
 
+import argparse
 import contextlib
 import io
+import json
 import math
 import statistics
 import subprocess
@@ -93,3 +95,23 @@ def benchmark_suite(
         "startup_ms": _startup_ms(startup_repeats),
         "targets": TARGETS,
     }
+
+
+def main() -> None:
+    """Run the benchmark CLI and emit its JSON report."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--fixtures", type=Path, default=Path("tests/fixtures"))
+    parser.add_argument("--repeats", type=int, default=5)
+    parser.add_argument("--startup-repeats", type=int, default=5)
+    args = parser.parse_args()
+    if min(args.repeats, args.startup_repeats) < 1:
+        parser.error("repeat counts must be positive")
+    report = benchmark_suite(
+        args.fixtures, repeats=args.repeats, startup_repeats=args.startup_repeats
+    )
+    report["target_status"] = targets_met(report)
+    sys.stdout.write(f"{json.dumps(report, indent=2, sort_keys=True)}\n")
+
+
+if __name__ == "__main__":
+    main()
