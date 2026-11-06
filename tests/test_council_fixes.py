@@ -19,7 +19,7 @@ import os
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stderr
+from contextlib import contextmanager, redirect_stderr
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -29,6 +29,18 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 import extract  # noqa: E402
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
+
+
+@contextmanager
+def temporary_jsonl(lines):
+    """Write JSONL input and remove it after the caller finishes."""
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as stream:
+        stream.writelines(json.dumps(line) + "\n" for line in lines)
+        path = Path(stream.name)
+    try:
+        yield path
+    finally:
+        path.unlink()
 
 
 # ---------------------------------------------------------------------------
