@@ -1,7 +1,8 @@
 from pathlib import Path
 
 import pytest
-from scripts.install_manager import InstallError, install
+
+from scripts.install_manager import InstallError, install, uninstall
 
 
 def repository(tmp_path: Path) -> Path:
@@ -36,3 +37,18 @@ def test_install_rejects_an_unowned_skill_copy(tmp_path: Path) -> None:
 
     with pytest.raises(InstallError, match="unmanaged path"):
         install(root, tmp_path / "home", lambda _command: 0)
+
+
+def test_uninstall_removes_managed_files_but_preserves_state(tmp_path: Path) -> None:
+    root = repository(tmp_path)
+    home = tmp_path / "home"
+    state = home / ".local/state/agent-retro/proposals.sqlite3"
+    state.parent.mkdir(parents=True)
+    state.touch()
+    install(root, home, lambda _command: 0)
+
+    uninstall(root, home, lambda _command: 0)
+
+    assert not (home / ".codex/skills/agent-retro").exists()
+    assert not (home / ".local/bin/agent-retro").exists()
+    assert state.exists()
