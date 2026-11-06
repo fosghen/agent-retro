@@ -16,6 +16,8 @@ class DailyCodexRetroTests(unittest.TestCase):
         with patch("scripts.daily_codex_retro.shutil.which", return_value="/bin/codex"):
             result = command(Path("/home/test"), date(2026, 11, 2), report)
         self.assertEqual(result[0:2], ["/bin/codex", "exec"])
+        self.assertIn("gpt-6-luna", result)
+        self.assertIn('model_reasoning_effort="medium"', result)
         self.assertIn("read-only", result)
         self.assertIn(str(report), result)
         self.assertIn("2026/11/02", result[-1])
