@@ -40,7 +40,14 @@ Development must follow this order:
 7. Push once. The installed pre-push hook runs the complete content quality gate;
    do not run that gate manually as well. If the hook is unavailable, run the
    gate manually once and keep the missing-hook limitation visible.
-8. Publish one focused PR whose `Closes #N` matches the branch issue.
+8. Build the PR body from `.github/pull_request_template.md`, then validate the
+   exact draft with `python scripts/check_pr_process.py --body-file /tmp/pr-body.md
+   --branch "$(git branch --show-current)"` before publishing it through `gh api`.
+   Publish one focused PR whose `Closes #N` matches the branch issue.
+
+Before granting a controlled agent commit or push authority, ensure its sandbox
+can write both the worktree and the path returned by `git rev-parse
+--git-common-dir`. Do not advertise authority that the execution boundary blocks.
 
 Use independent review only when the PR changes persisted schemas or migrations,
 concurrency or transaction boundaries, privacy/security/authentication/
