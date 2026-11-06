@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import plistlib
 from collections.abc import Callable
 from pathlib import Path  # noqa: TC003 -- runtime path construction is intentionally local
@@ -21,6 +22,17 @@ def _link(target: Path, source: Path) -> None:
         raise InstallError(f"unmanaged path: {target}")  # noqa: EM102, TRY003
     target.parent.mkdir(parents=True, exist_ok=True)
     target.symlink_to(source)
+
+
+def _unlink(target: Path, source: Path) -> None:
+    if target.is_symlink() and target.resolve() == source.resolve():
+        target.unlink()
+    elif target.exists() or target.is_symlink():
+        raise InstallError(f"unmanaged path: {target}")  # noqa: EM102, TRY003
+
+
+def _domain() -> str:
+    return f"gui/{os.getuid()}"
 
 
 def install(root: Path, home: Path, execute: Execute) -> None:
@@ -45,3 +57,20 @@ def install(root: Path, home: Path, execute: Execute) -> None:
         "ProcessType": "Background",
     }
     plist.write_bytes(plistlib.dumps(payload))
+    execute(("launchctl", "bootout", f"{_domain()}/{LABEL}"))
+    if execute(("launchctl", "bootstrap", _domain(), str(plist))):
+        raise InstallError("LaunchAgent bootstrap failed")  # noqa: EM101, TRY003
+
+
+def uninstall(root: Path, home: Path, execute: Execute) -> None:
+    """Remove managed entry points while preserving local application state."""
+    _unlink(home / ".codex/skills/agent-retro", root)
+    _unlink(home / ".local/bin/agent-retro", root / ".venv/bin/agent-retro")
+    plist = home / f"Library/LaunchAgents/{LABEL}.plist"
+    if plist.exists():
+        payload = plistlib.loads(plist.read_bytes())
+        expected = [str(root / ".venv/bin/python"), str(root / "scripts/daily_codex_retro.py")]
+        if payload.get("ProgramArguments") != expected:
+            raise InstallError(f"unmanaged path: {plist}")  # noqa: EM102, TRY003
+        execute(("launchctl", "bootout", f"{_domain()}/{LABEL}"))
+        plist.unlink()
