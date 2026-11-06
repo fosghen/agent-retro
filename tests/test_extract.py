@@ -865,39 +865,42 @@ class TestKnownBugListContentUserMessages(unittest.TestCase):
                 "timestamp": "2026-04-06T14:00:30Z",
             },
         ]
-        with open(cls.fixture_path, "w") as f:
-            for line in lines:
-                f.write(json.dumps(line) + "\n")
+        with cls.fixture_path.open("w") as f:
+            f.writelines(json.dumps(line) + "\n" for line in lines)
 
         cls.result = extract.extract_all_streaming(str(cls.fixture_path))
-        cls.arc_user_texts = [m["text"] for m in cls.result["conversation_arc"]
-                              if m["role"] == "user"]
+        cls.arc_user_texts = [
+            m["text"] for m in cls.result["conversation_arc"] if m["role"] == "user"
+        ]
 
     def test_string_content_captured(self):
         """User messages in string format ARE captured (this works)."""
         self.assertTrue(
             any("string format" in t for t in self.arc_user_texts),
-            "String-format user message should be in arc"
+            "String-format user message should be in arc",
         )
 
     def test_list_text_block_captured(self):
         """User text blocks in list format are now captured (bug fixed)."""
         self.assertTrue(
             any("list format" in t for t in self.arc_user_texts),
-            "List-format user text should be captured in arc"
+            "List-format user text should be captured in arc",
         )
 
     def test_mixed_content_text_captured(self):
         """User text blocks mixed with tool_result in list content are now captured."""
         self.assertTrue(
             any("mixed content" in t for t in self.arc_user_texts),
-            "Mixed list-format user text should be captured in arc"
+            "Mixed list-format user text should be captured in arc",
         )
 
     def test_all_user_messages_captured(self):
         """All user messages with text should be captured (bug fixed)."""
-        self.assertEqual(len(self.arc_user_texts), 3,
-                         f"Expected 3 user messages, got {len(self.arc_user_texts)}: {self.arc_user_texts}")
+        self.assertEqual(
+            len(self.arc_user_texts),
+            3,
+            f"Expected 3 user messages, got {len(self.arc_user_texts)}: {self.arc_user_texts}",
+        )
 
 
 # ---------------------------------------------------------------------------
