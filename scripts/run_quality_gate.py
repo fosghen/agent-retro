@@ -15,7 +15,7 @@ def commands(uv: str) -> tuple[tuple[str, ...], ...]:
         (*prefix, "python", "scripts/check_agent_config.py"),
         (*prefix, "python", "scripts/check_ruff.py"),
         (*prefix, "pytest"),
-        (*prefix, "mypy", "--strict", "src/agent_retro"),
+        (*prefix, "mypy", "--strict", "src/agent_retro", "scripts"),
         (*prefix, "bandit", "-q", "-r", "src", "scripts"),
         (*prefix, "pip-audit"),
         (*prefix, "agent-retro", "--help"),
