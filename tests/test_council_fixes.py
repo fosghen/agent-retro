@@ -262,12 +262,27 @@ class TestFix5SubagentDirWarning(unittest.TestCase):
         """Running extraction with no subagents dir should emit a note to stderr."""
         # Create a minimal fixture
         lines = [
-            {"sessionId": "test", "timestamp": "2026-04-06T15:00:00Z",
-             "message": {"role": "assistant", "content": [
-                 {"type": "tool_use", "id": "tu_agent", "name": "Agent",
-                  "input": {"description": "test", "prompt": "do something"}}
-             ], "usage": {"input_tokens": 0, "output_tokens": 100,
-                          "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0}}},
+            {
+                "sessionId": "test",
+                "timestamp": "2026-04-06T15:00:00Z",
+                "message": {
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "tool_use",
+                            "id": "tu_agent",
+                            "name": "Agent",
+                            "input": {"description": "test", "prompt": "do something"},
+                        }
+                    ],
+                    "usage": {
+                        "input_tokens": 0,
+                        "output_tokens": 100,
+                        "cache_creation_input_tokens": 0,
+                        "cache_read_input_tokens": 0,
+                    },
+                },
+            },
         ]
         with temporary_jsonl(lines) as path:
             # Capture stderr
@@ -278,8 +293,11 @@ class TestFix5SubagentDirWarning(unittest.TestCase):
         agents_without_cost = [a for a in result["agents"] if a["estimated_cost_usd"] is None]
         if agents_without_cost:
             stderr_output = stderr_capture.getvalue()
-            self.assertIn("subagent", stderr_output.lower(),
-                          "No stderr warning about missing subagent cost data")
+            self.assertIn(
+                "subagent",
+                stderr_output.lower(),
+                "No stderr warning about missing subagent cost data",
+            )
 
 
 # ---------------------------------------------------------------------------
