@@ -25,6 +25,12 @@ jobs:
         with:
           version: "0.12.18"
           enable-cache: true
+      - name: Check live issue state
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+        run: python scripts/check_issue_state.py
       - name: Check pull request process declaration
         if: github.event_name == 'pull_request'
         env:
