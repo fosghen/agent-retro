@@ -17,14 +17,10 @@ from pathlib import Path
 
 from agent_retro.transcript_aggregate import (
     PRICING_LAST_VERIFIED,
-    add_assistant_usage,
     attach_result_sizes,
-    empty_token_totals,
     estimated_cost,
-    result_size_bytes,
     result_size_stats,
 )
-from agent_retro.transcript_conversation import assistant_arc_item, user_arc_item
 from agent_retro.transcript_io import (
     LITE_READ_BUF_SIZE,
     detect_transcript_format,
@@ -34,22 +30,17 @@ from agent_retro.transcript_io import (
 from agent_retro.transcript_metadata import (
     extract_json_field,
     extract_metadata_lite as _typed_metadata_lite,
-    is_injected_user_text as _is_injected_user_text,
-    parse_timestamp as parse_ts,
 )
 from agent_retro.transcript_normalize import stream_normalized_jsonl as stream_jsonl
-from agent_retro.transcript_session import empty_session, finalize_session, record_session
+from agent_retro.transcript_session import finalize_session
 from agent_retro.transcript_stream import new_stream_state, process_record
 from agent_retro.transcript_subagents import discover_subagents, project_agents
 from agent_retro.transcript_subagents import match_subagents
 from agent_retro.transcript_tools import (
-    record_tool_activity,
     skill_summaries,
-    tool_call_summary,
     tool_result_view,
 )
-
-SCHEMA_VERSION = "0.1.0"
+from agent_retro.transcript_result import extract_transcript
 
 
 def extract_metadata_lite(path):
