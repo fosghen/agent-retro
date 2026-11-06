@@ -1,6 +1,7 @@
 import json
 import subprocess
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from scripts.workflow_status import (
@@ -39,6 +40,10 @@ def query(tool: str, *args: str) -> str:
 
 
 class WorkflowStatusTests(unittest.TestCase):
+    def test_pre_push_owns_the_publication_gate(self) -> None:
+        config = (Path(__file__).parents[1] / ".pre-commit-config.yaml").read_text()
+        assert "python -m scripts.workflow_status --publication" in config
+
     def test_publication_requires_clean_committed_work(self) -> None:
         cases = (
             ({("git", "status", "--porcelain"): " M file.py"}, "clean worktree"),
