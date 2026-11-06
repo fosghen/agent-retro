@@ -31,6 +31,10 @@ def command(home: Path, day: date, report: Path) -> list[str]:
     return [
         codex,
         "exec",
+        "--model",
+        "gpt-6-luna",
+        "--config",
+        'model_reasoning_effort="medium"',
         "--skip-git-repo-check",
         "--sandbox",
         "read-only",
