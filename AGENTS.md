@@ -35,12 +35,12 @@ Development must follow this order:
    focused checks while editing.
 5. Self-review the complete diff. Independent review is not a routine quality
    gate and PR size alone is never a reason to request it.
-6. Run `uv run --frozen --no-sync python scripts/run_quality_gate.py` once after
-   the diff is stable. This validates content, not Git history. Repeat it only
-   when code changes after that successful run.
-7. Create the logical commits, then run `uv run --frozen --no-sync python -m
+6. Create the logical commits, then run `uv run --frozen --no-sync python -m
    scripts.workflow_status --publication` on the clean branch.
-8. Push and publish one focused PR whose `Closes #N` matches the branch issue.
+7. Push once. The installed pre-push hook runs the complete content quality gate;
+   do not run that gate manually as well. If the hook is unavailable, run the
+   gate manually once and keep the missing-hook limitation visible.
+8. Publish one focused PR whose `Closes #N` matches the branch issue.
 
 Use independent review only when the PR changes persisted schemas or migrations,
 concurrency or transaction boundaries, privacy/security/authentication/
