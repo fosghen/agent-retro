@@ -312,8 +312,7 @@ class TestFix6SchemaVersion(unittest.TestCase):
         ]
         with temporary_jsonl(lines) as path:
             result = extract.extract_all_streaming(str(path))
-        self.assertIn("schema_version", result,
-                       "Output missing schema_version field")
+        self.assertIn("schema_version", result, "Output missing schema_version field")
 
     def test_schema_version_is_string(self):
         lines = [
