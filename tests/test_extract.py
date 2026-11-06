@@ -369,7 +369,7 @@ class TestConversationArc(unittest.TestCase):
         for msg in self.arc:
             self.assertFalse(
                 msg["text"].startswith("<system-reminder>"),
-                f"system-reminder leaked into arc: {msg['text'][:50]}"
+                f"system-reminder leaked into arc: {msg['text'][:50]}",
             )
 
     def test_arc_message_has_required_fields(self):
@@ -393,10 +393,12 @@ class TestConversationArc(unittest.TestCase):
     def test_arc_preserves_user_correction(self):
         """The user correction ('wait i also need...') should appear in the arc."""
         user_texts = [m["text"] for m in self.arc if m["role"] == "user"]
-        correction_found = any("validate" in t.lower() or "signature" in t.lower()
-                               for t in user_texts)
-        self.assertTrue(correction_found,
-                        "User correction about signature validation not found in arc")
+        correction_found = any(
+            "validate" in t.lower() or "signature" in t.lower() for t in user_texts
+        )
+        self.assertTrue(
+            correction_found, "User correction about signature validation not found in arc"
+        )
 
     def test_short_assistant_messages_filtered(self):
         """Assistant messages <= 20 chars are filtered (too short to be meaningful)."""
@@ -420,8 +422,15 @@ class TestAgentDispatches(unittest.TestCase):
 
     def test_agent_has_required_fields(self):
         agent = self.agents[0]
-        for field in ("description", "type", "model", "prompt_preview",
-                      "background", "timestamp", "tool_use_id"):
+        for field in (
+            "description",
+            "type",
+            "model",
+            "prompt_preview",
+            "background",
+            "timestamp",
+            "tool_use_id",
+        ):
             self.assertIn(field, agent, f"agent missing field: {field}")
 
     def test_agent_description(self):
@@ -525,8 +534,7 @@ class TestFileTracking(unittest.TestCase):
     def test_files_are_sorted_lists(self):
         """File sets should be serialized as sorted lists."""
         for category, file_list in self.files.items():
-            self.assertIsInstance(file_list, list,
-                                  f"files[{category!r}] is not a list")
+            self.assertIsInstance(file_list, list, f"files[{category!r}] is not a list")
 
 
 # ---------------------------------------------------------------------------
@@ -545,8 +553,12 @@ class TestEmptySession(unittest.TestCase):
         self.assertEqual(self.result["conversation_arc"], [])
 
     def test_token_totals_zero(self):
-        for field in ("input_tokens", "output_tokens",
-                      "cache_creation_input_tokens", "cache_read_input_tokens"):
+        for field in (
+            "input_tokens",
+            "output_tokens",
+            "cache_creation_input_tokens",
+            "cache_read_input_tokens",
+        ):
             self.assertEqual(self.result["tokens"]["total"][field], 0)
 
     def test_no_agents(self):
@@ -599,8 +611,17 @@ class TestToolResultsOnly(unittest.TestCase):
 
     def test_result_structure_intact(self):
         """All top-level keys must be present even when session is nearly empty."""
-        for key in ("session", "tokens", "agents", "skills", "git",
-                    "files", "conversation_arc", "tool_result_sizes", "tools"):
+        for key in (
+            "session",
+            "tokens",
+            "agents",
+            "skills",
+            "git",
+            "files",
+            "conversation_arc",
+            "tool_result_sizes",
+            "tools",
+        ):
             self.assertIn(key, self.result, f"missing key: {key}")
 
 
