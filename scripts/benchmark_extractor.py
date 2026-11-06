@@ -4,9 +4,12 @@ import contextlib
 import io
 import math
 import statistics
+import subprocess
+import sys
 import time
 import tracemalloc
 from pathlib import Path
+from typing import Any
 
 from agent_retro.transcript_result import extract_transcript
 
@@ -49,4 +52,44 @@ def _workload_metrics(path: Path, repeats: int) -> dict[str, float | int]:
         "iterations": iterations,
         "throughput_mib_s": round((size * iterations / MIB) / elapsed, 3),
         "peak_traced_mib": round(peak / MIB, 3),
+    }
+
+
+def _startup_ms(repeats: int) -> float:
+    command = [sys.executable, "-c", "import agent_retro.transcript_result"]
+    samples = []
+    for _ in range(repeats):
+        started = time.perf_counter()
+        subprocess.run(command, check=True)  # noqa: S603
+        samples.append((time.perf_counter() - started) * 1000)
+    return round(statistics.median(samples), 3)
+
+
+def targets_met(report: dict[str, Any]) -> dict[str, bool]:
+    """Evaluate the published benchmark targets against one report."""
+    workloads = report["workloads"].values()
+    return {
+        "throughput": min(item["throughput_mib_s"] for item in workloads)
+        >= TARGETS["minimum_throughput_mib_s"],
+        "peak_memory": max(item["peak_traced_mib"] for item in workloads)
+        <= TARGETS["maximum_peak_traced_mib"],
+        "startup": report["startup_ms"] <= TARGETS["maximum_startup_ms"],
+    }
+
+
+def benchmark_suite(
+    fixtures: Path, *, repeats: int = 5, startup_repeats: int = 5
+) -> dict[str, Any]:
+    """Measure fixed synthetic workloads and return a stable JSON-ready report."""
+    workloads = {
+        name: _workload_metrics(fixtures / filename, repeats)
+        for name, filename in WORKLOADS.items()
+    }
+    return {
+        "method": "median wall time; tracemalloc peak; isolated import startup",
+        "repeats": repeats,
+        "startup_repeats": startup_repeats,
+        "workloads": workloads,
+        "startup_ms": _startup_ms(startup_repeats),
+        "targets": TARGETS,
     }
