@@ -13,11 +13,9 @@ Use --metadata-only for cheap session verification (head/tail read only).
 import json
 import sys
 import os
-from collections import defaultdict
 from pathlib import Path
 
 from agent_retro.transcript_aggregate import (
-    PRICE_PER_M,
     PRICING_LAST_VERIFIED,
     add_assistant_usage,
     attach_result_sizes,
