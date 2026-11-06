@@ -106,6 +106,13 @@ class WorkflowStatusTests(unittest.TestCase):
         with self.assertRaisesRegex(WorkflowStatusError, "absent"):
             collect(lambda tool, *args: responses[(tool, *args)])
 
+    def test_reports_closed_issue(self) -> None:
+        responses = dict(RESPONSES)
+        key = ("gh", "issue", "view", "102", "--json", "number,state")
+        responses[key] = '{"number":102,"state":"CLOSED"}'
+        with self.assertRaisesRegex(WorkflowStatusError, "must be open"):
+            collect(lambda tool, *args: responses[(tool, *args)])
+
     def test_execute_uses_resolved_binary_without_a_shell(self) -> None:
         completed = subprocess.CompletedProcess([], 0, stdout="ok\n", stderr="")
         with (
