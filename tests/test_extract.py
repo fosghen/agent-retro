@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Tests for extract.py — verifies extraction correctness against JSONL fixtures.
 
@@ -12,10 +11,10 @@ so run from the skill root directory (/tmp/claude-code-retro/).
 """
 
 import json
-import os
 import sys
 import unittest
 from pathlib import Path
+from typing import ClassVar
 
 # Allow running from any directory by adding the script's repo root to sys.path
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -23,11 +22,10 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import extract  # noqa: E402
 
-
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 
 
-def load_fixture_result(fixture_name, summary=False, metadata_only=False):
+def load_fixture_result(fixture_name, *, summary=False, metadata_only=False):
     """Run the extractor against a named fixture and return the parsed result."""
     path = str(FIXTURES_DIR / fixture_name)
     if metadata_only:
@@ -68,8 +66,10 @@ class TestMetadataOnly(unittest.TestCase):
         # String-format content → first_prompt is None (metadata-only limitation)
         # This is expected behavior for the current fixture format.
         # If this changes, the metadata-only path was improved — update the assertion.
-        self.assertIsNone(self.meta["first_prompt"],
-                          "Expected None for string-format content — if fixed, update this test")
+        self.assertIsNone(
+            self.meta["first_prompt"],
+            "Expected None for string-format content — if fixed, update this test",
+        )
 
     def test_first_prompt_works_with_text_block_format(self):
         """first_prompt IS extracted when user messages use {"type":"text","text":"..."} format.
@@ -123,22 +123,24 @@ class TestCodexSession(unittest.TestCase):
     def test_metadata_only(self):
         self.assertEqual(self.meta["agent"], "codex")
         self.assertEqual(self.meta["session_id"], "codex-session-123")
-        self.assertEqual(self.meta["cwd"], "/tmp/codex-project")
+        self.assertEqual(
+            self.meta["cwd"],
+            "/tmp/codex-project",  # noqa: S108 - fixture data, not filesystem use.
+        )
         self.assertEqual(self.meta["first_prompt"], "Review yesterday's sessions.")
 
     def test_session_and_messages(self):
         self.assertEqual(self.result["session"]["session_id"], "codex-session-123")
-        assistant = [item for item in self.result["conversation_arc"]
-                     if item["role"] == "assistant"]
+        assistant = [
+            item for item in self.result["conversation_arc"] if item["role"] == "assistant"
+        ]
         self.assertEqual(len(assistant), 2)
-        users = [item["text"] for item in self.result["conversation_arc"]
-                 if item["role"] == "user"]
+        users = [item["text"] for item in self.result["conversation_arc"] if item["role"] == "user"]
         self.assertEqual(users, ["Review yesterday's sessions."])
 
     def test_tool_calls_and_results_are_correlated(self):
         self.assertEqual(self.result["tools"]["counts"]["exec"], 1)
-        call = next(item for item in self.result["tools"]["calls"]
-                    if item["name"] == "exec")
+        call = next(item for item in self.result["tools"]["calls"] if item["name"] == "exec")
         self.assertEqual(call["command"], "git status --short")
         self.assertGreater(call["result_size_bytes"], 0)
 
@@ -197,8 +199,12 @@ class TestTokenUsage(unittest.TestCase):
 
     def test_token_totals_structure(self):
         """All four token fields must be present."""
-        for field in ("input_tokens", "output_tokens",
-                      "cache_creation_input_tokens", "cache_read_input_tokens"):
+        for field in (
+            "input_tokens",
+            "output_tokens",
+            "cache_creation_input_tokens",
+            "cache_read_input_tokens",
+        ):
             self.assertIn(field, self.tokens["total"], f"missing token field: {field}")
 
     def test_output_tokens_nonzero(self):
@@ -257,8 +263,7 @@ class TestToolCalls(unittest.TestCase):
         self.assertEqual(self.counts.get("Skill", 0), 1)
 
     def test_total_calls_sum(self):
-        self.assertEqual(self.result["tools"]["total_calls"],
-                         sum(self.counts.values()))
+        self.assertEqual(self.result["tools"]["total_calls"], sum(self.counts.values()))
 
     def test_summary_mode_omits_call_list(self):
         """In summary mode, individual call listings should be absent."""
@@ -312,15 +317,14 @@ class TestToolResultSizes(unittest.TestCase):
                 self.assertIn(field, stats, f"{tool_name} missing {field}")
 
     def test_sizes_are_non_negative(self):
-        for tool_name, stats in self.sizes.items():
+        for stats in self.sizes.values():
             self.assertGreaterEqual(stats["total_bytes"], 0)
             self.assertGreaterEqual(stats["avg_bytes"], 0)
             self.assertGreaterEqual(stats["max_bytes"], 0)
 
     def test_result_size_attached_to_call(self):
         """Calls with known result IDs should have result_size_bytes populated."""
-        calls_with_size = [c for c in self.result["tools"]["calls"]
-                           if "result_size_bytes" in c]
+        calls_with_size = [c for c in self.result["tools"]["calls"] if "result_size_bytes" in c]
         # Every tool call in the fixture has a result, so at least one should match
         self.assertGreater(len(calls_with_size), 0)
 
