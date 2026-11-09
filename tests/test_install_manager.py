@@ -72,6 +72,21 @@ def test_upgrade_rejects_drift_before_replacing_links(tmp_path: Path) -> None:
     assert (home / ".codex/skills/agent-retro").resolve() == old
 
 
+def test_upgrade_preflights_all_installed_links(tmp_path: Path) -> None:
+    old = repository(tmp_path / "old")
+    selected = repository(tmp_path / "selected")
+    home = tmp_path / "home"
+    install(old, home, lambda _command: 0)
+    cli = home / ".local/bin/agent-retro"
+    cli.unlink()
+    cli.symlink_to(selected / ".venv/bin/agent-retro")
+
+    with pytest.raises(InstallError, match="installed links"):
+        upgrade(selected, home, lambda _command: 0)
+
+    assert (home / ".codex/skills/agent-retro").resolve() == old
+
+
 def test_upgrade_switches_to_selected_checkout_and_refreshes_lock(tmp_path: Path) -> None:
     old = repository(tmp_path / "old")
     selected = repository(tmp_path / "selected")

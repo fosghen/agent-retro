@@ -37,6 +37,26 @@ def _domain() -> str:
     return f"gui/{os.getuid()}"
 
 
+def _require_installed(root: Path, home: Path) -> None:
+    links = {
+        home / ".codex/skills/agent-retro": root,
+        home / ".local/bin/agent-retro": root / ".venv/bin/agent-retro",
+    }
+    if any(
+        not target.is_symlink() or target.resolve() != source.resolve()
+        for target, source in links.items()
+    ):
+        raise InstallError("installed links do not match lock source")  # noqa: EM101, TRY003
+    plist = home / f"Library/LaunchAgents/{LABEL}.plist"
+    expected = [str(root / ".venv/bin/python"), str(root / "scripts/daily_codex_retro.py")]
+    try:
+        arguments = plistlib.loads(plist.read_bytes()).get("ProgramArguments")
+    except (OSError, plistlib.InvalidFileException, ValueError) as error:
+        raise InstallError(f"unmanaged path: {plist}") from error  # noqa: EM102, TRY003
+    if arguments != expected:
+        raise InstallError(f"unmanaged path: {plist}")  # noqa: EM102, TRY003
+
+
 def _validate(root: Path, execute: Execute) -> None:
     python = root / ".venv/bin/python"
     cli = root / ".venv/bin/agent-retro"
@@ -83,6 +103,7 @@ def upgrade(root: Path, home: Path, execute: Execute) -> None:
         raise InstallError(str(error)) from error
     if observed != locked:
         raise InstallError("local drift detected")  # noqa: EM101, TRY003
+    _require_installed(current, home)
     _validate(root, execute)
     uninstall(current, home, execute)
     install(root, home, execute)

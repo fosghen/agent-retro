@@ -15,7 +15,7 @@ class LockError(RuntimeError):
 
 
 def _git(root: Path, *arguments: str) -> str:
-    result = subprocess.run(  # noqa: S603  # nosec B603
+    result = subprocess.run(  # noqa: S603  # nosec B603 B607
         ["git", "-C", str(root), *arguments],  # noqa: S607
         check=False,
         capture_output=True,
