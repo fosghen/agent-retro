@@ -1,11 +1,18 @@
 import subprocess
+import tomllib
 import unittest
+from pathlib import Path
 from unittest.mock import call, patch
 
 from scripts.run_quality_gate import commands, main
 
 
 class QualityGateTests(unittest.TestCase):
+    def test_coverage_policy_preserves_measured_ratchet(self) -> None:
+        config = tomllib.loads(Path("pyproject.toml").read_text())
+        self.assertIn("--cov-branch", config["tool"]["pytest"]["ini_options"]["addopts"])
+        self.assertEqual(config["tool"]["coverage"]["report"]["fail_under"], 85)
+
     def test_commands_are_complete_and_deterministic(self) -> None:
         result = commands("/bin/uv")
         self.assertEqual(len(result), 10)
