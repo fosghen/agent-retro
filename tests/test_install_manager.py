@@ -1,3 +1,4 @@
+import os
 import subprocess
 from pathlib import Path
 
@@ -68,7 +69,19 @@ def test_shell_entrypoint_loads_from_any_directory(tmp_path: Path) -> None:
     )
 
     assert result.returncode == INPUT_ERROR
-    assert result.stderr == "Usage: manage_install.py {install|uninstall}\n"
+    assert result.stderr == "Usage: manage_install.py {install|status|uninstall}\n"
+
+    status = subprocess.run(  # noqa: S603 -- fixed supported entrypoint
+        ["/bin/sh", str(ROOT / "scripts/install_launchd.sh"), "status"],
+        cwd=tmp_path,
+        env=os.environ | {"HOME": str(tmp_path / "empty-home")},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert status.returncode == 0
+    assert "cli: missing; run install" in status.stdout
+    assert "launchagent: missing; run install" in status.stdout
 
 
 def test_readme_uses_supported_install_lifecycle() -> None:
@@ -83,5 +96,5 @@ def test_readme_uses_supported_install_lifecycle() -> None:
     assert all(command in readme for command in commands)
     assert "canonical source" in readme
     assert "unmanaged" in readme
-    assert "#114" in readme
+    assert "./scripts/install_launchd.sh status" in readme
     assert "#115" in readme
