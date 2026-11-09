@@ -31,16 +31,35 @@ This is the equivalent of an agile sprint retrospective, but for a single AI ses
 
 ## Install for Codex
 
-Clone this repository into the Codex skills directory and install its locked environment:
+Keep one development clone as the canonical source. The supported installer
+creates managed links for the Codex skill and CLI, validates the skill, and
+registers the daily macOS LaunchAgent:
 
 ```bash
-git clone https://github.com/fosghen/agent-retro.git ~/.codex/skills/agent-retro
-cd ~/.codex/skills/agent-retro
+git clone https://github.com/fosghen/agent-retro.git "$HOME/agent-retro-src"
+cd "$HOME/agent-retro-src"
 uv sync --locked --all-groups
+./scripts/install_launchd.sh install
+```
+
+The clone is the owned source; keep it at that path while Agent Retro is
+installed. Installation refuses to replace an existing unmanaged skill, CLI, or
+LaunchAgent artifact. Remove or migrate such an artifact explicitly instead of
+letting the installer overwrite it.
+
+Uninstall from the same canonical source. This removes only managed entrypoints
+and the LaunchAgent; local reports and application state are preserved:
+
+```bash
+cd "$HOME/agent-retro-src"
+./scripts/install_launchd.sh uninstall
 ```
 
 Start a new Codex session if `agent-retro` is not immediately listed among the available skills.
 Claude Code-specific installation and runtime behavior are outside the project's release guarantees.
+Installed-version and schedule-health reporting remain tracked by
+[#114](https://github.com/fosghen/agent-retro/issues/114); locked upgrades with
+drift detection remain tracked by [#115](https://github.com/fosghen/agent-retro/issues/115).
 
 ## Usage
 
@@ -61,13 +80,8 @@ The skill will:
 
 ### Daily Codex retrospective on macOS
 
-Install the optional LaunchAgent from a local clone:
-
-```bash
-./scripts/install_launchd.sh
-```
-
-It runs at 09:00 local time and analyzes only the previous day's Codex sessions.
+The supported installation registers a LaunchAgent that runs at 09:00 local
+time and analyzes only the previous day's Codex sessions.
 The background Codex process uses GPT-6 Luna at medium reasoning in a read-only
 sandbox and writes its final
 Markdown report to `~/.codex/worklog/retros/YYYY-MM-DD-daily.md`. Scheduler logs

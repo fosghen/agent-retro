@@ -69,3 +69,19 @@ def test_shell_entrypoint_loads_from_any_directory(tmp_path: Path) -> None:
 
     assert result.returncode == INPUT_ERROR
     assert result.stderr == "Usage: manage_install.py {install|uninstall}\n"
+
+
+def test_readme_uses_supported_install_lifecycle() -> None:
+    readme = (ROOT / "README.md").read_text()
+    commands = (
+        'git clone https://github.com/fosghen/agent-retro.git "$HOME/agent-retro-src"',
+        'cd "$HOME/agent-retro-src"',
+        "uv sync --locked --all-groups",
+        "./scripts/install_launchd.sh install",
+        "./scripts/install_launchd.sh uninstall",
+    )
+    assert all(command in readme for command in commands)
+    assert "canonical source" in readme
+    assert "unmanaged" in readme
+    assert "#114" in readme
+    assert "#115" in readme
