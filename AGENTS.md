@@ -27,7 +27,7 @@ Development must follow this order:
 
 1. Register an issue containing the outcome, acceptance criteria, scope, and
    known risk triggers.
-2. Split it before implementation when one coherent commit cannot fit 50 lines,
+2. Split it before implementation when one coherent commit cannot fit 75 lines,
    the work cannot fit one 250-line PR, or it contains independently deliverable
    high-risk components. Never manufacture a post-hoc split of one coherent diff.
 3. Create a branch containing `issue-N`, matching the registered issue number.
@@ -74,7 +74,7 @@ concurrency or transaction boundaries, privacy/security/authentication/
 authorization, destructive or external side effects, or when concrete
 correctness uncertainty remains after self-review. Declare the trigger in the PR.
 
-Never commit directly to `main`. Each logical commit may contain at most 50
+Never commit directly to `main`. Each logical commit may contain at most 75
 changed lines, each PR at most 250 changed lines and 5 commits, and binary changes
 are forbidden. Never split coherent code solely to approach a line limit, and
 never bypass configured hooks with `--no-verify`.

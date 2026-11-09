@@ -8,7 +8,7 @@ local configured checks.
 - The shared gate checks agent metadata, shell and plist syntax, package build and
   clean installation, repository-wide Ruff, pytest with branch coverage, strict
   mypy, Bandit, pip-audit, the installed CLI, and the skill contract.
-- Pull-request CI rejects more than five commits, commits over 50 changed lines,
+- Pull-request CI rejects more than five commits, commits over 75 changed lines,
   pull requests over 250 changed lines, binary changes, branches without an issue
   reference, closed issue references, and contradictory risk declarations.
 - CI installs the locked Python 3.12 environment and invokes the same shared gate

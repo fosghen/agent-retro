@@ -6,10 +6,11 @@ from scripts.check_change_limits import ChangeLimitError, check, count_lines
 class ChangeLimitTests(unittest.TestCase):
     def test_accepts_boundaries(self) -> None:
         check("feature/issue-94-topic", {str(index): "25\t25\tfile.py" for index in range(5)})
+        check("feature/issue-94-topic", {"boundary": "75\t0\tfile.py"})
 
     def test_rejects_large_commit(self) -> None:
-        with self.assertRaisesRegex(ChangeLimitError, "51 changed lines"):
-            check("feature/issue-94-topic", {"large": "51\t0\tfile.py"})
+        with self.assertRaisesRegex(ChangeLimitError, "76 changed lines"):
+            check("feature/issue-94-topic", {"large": "76\t0\tfile.py"})
 
     def test_rejects_large_pull_request(self) -> None:
         commits = {str(index): "50\t1\tfile.py" for index in range(5)}
@@ -36,7 +37,7 @@ class ChangeLimitTests(unittest.TestCase):
     def test_only_generated_root_lock_is_excluded(self) -> None:
         self.assertEqual(count_lines("500\t500\tuv.lock"), 0)
         with self.assertRaises(ChangeLimitError):
-            check("feature/issue-94-topic", {"large": "51\t0\tnested/uv.lock"})
+            check("feature/issue-94-topic", {"large": "76\t0\tnested/uv.lock"})
         with self.assertRaises(ChangeLimitError):
             count_lines("-\t-\tuv.lock")
 
