@@ -154,11 +154,19 @@ Contributions welcome — if you know where another agent stores its session dat
 - Python 3.12 and `uv` for development and installation
 - Tested transcript formats: Claude Code v2.1.59+ and current Codex rollout JSONL
 
-Install the locked environment and verify the CLI:
+## Development
+
+From a clean checkout, one idempotent command installs the locked environment,
+installs and verifies both pre-commit and pre-push hooks, and runs smoke checks:
 
 ```bash
-uv sync --locked --all-groups
-uv run agent-retro --help
+python3 scripts/setup_dev.py
+```
+
+Run the same complete publication gate used by pre-push and CI with:
+
+```bash
+uv run --frozen --no-sync python scripts/run_quality_gate.py
 ```
 
 ## Security
