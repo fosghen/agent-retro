@@ -14,6 +14,7 @@ ci_steps = [
 ]
 full_gate = [
   "python scripts/check_agent_config.py",
+  "python -m scripts.check_quality_policy",
   "python scripts/check_shell_plist.py",
   "python scripts/check_package.py",
   "python scripts/check_ruff.py",
@@ -22,7 +23,6 @@ full_gate = [
   "mypy --strict src/agent_retro scripts",
   "bandit -q -r src scripts",
   "pip-audit",
-  "python -m scripts.check_quality_policy",
   "agent-retro --help",
   "python scripts/check_skill.py",
 ]
