@@ -15,13 +15,14 @@ class QualityGateTests(unittest.TestCase):
 
     def test_commands_are_complete_and_deterministic(self) -> None:
         result = commands("/bin/uv")
-        self.assertEqual(len(result), 10)
+        self.assertEqual(len(result), 11)
         self.assertEqual(result[0][-2:], ("python", "scripts/check_agent_config.py"))
         self.assertEqual(result[1][-2:], ("python", "scripts/check_shell_plist.py"))
         self.assertEqual(result[2][-2:], ("python", "scripts/check_package.py"))
         self.assertEqual(result[3][-2:], ("python", "scripts/check_ruff.py"))
-        self.assertEqual(result[4][-1], "pytest")
-        self.assertEqual(result[5][-4:], ("mypy", "--strict", "src/agent_retro", "scripts"))
+        self.assertEqual(result[4][-2:], ("-m", "scripts.check_puzzles"))
+        self.assertEqual(result[5][-1], "pytest")
+        self.assertEqual(result[6][-4:], ("mypy", "--strict", "src/agent_retro", "scripts"))
         self.assertEqual(result[-2][-2:], ("agent-retro", "--help"))
         self.assertEqual(result[-1][-2:], ("python", "scripts/check_skill.py"))
         self.assertTrue(all("--frozen" in item and "--no-sync" in item for item in result))

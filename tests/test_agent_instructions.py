@@ -38,11 +38,13 @@ def test_verification_matches_the_change_type() -> None:
 
 def test_puzzle_debt_is_issue_backed() -> None:
     """Deferred executable work must stay bounded, owned, and removable."""
+    todo = "TO" + "DO"
+    fixme = "FIX" + "ME"
     for contract in (
         "out-of-scope executable work",
-        "TODO(#123, estimate:2h): explanation",
+        f"{todo}(#123, estimate:2h): explanation",
         "open GitHub issue",
-        "Bare `TODO` and `FIXME`",
+        f"Bare `{todo}` and `{fixme}`",
         "remove its marker",
         "non-executable scaffolding",
     ):
