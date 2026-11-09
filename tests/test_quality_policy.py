@@ -1,3 +1,4 @@
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -31,3 +32,24 @@ def test_missing_ci_command_fails() -> None:
     missing = ci.replace("python scripts/check_pr_process.py", "true")
     with pytest.raises(QualityPolicyError, match="CI entrypoints"):
         check(docs, hooks, missing)
+
+
+def test_expired_temporary_suppression_fails_with_identity() -> None:
+    docs, hooks, ci = repository_inputs()
+    expired = docs.replace(
+        "temporary_suppressions = []",
+        'temporary_suppressions = [{ id = "legacy", scope = "one.py", '
+        'reason = "migration", review_by = "2026-11-08" }]',
+    )
+    with pytest.raises(QualityPolicyError, match=r"legacy.*2026-11-08"):
+        check(expired, hooks, ci, today=date(2026, 11, 9))
+
+
+def test_incomplete_temporary_suppression_fails() -> None:
+    docs, hooks, ci = repository_inputs()
+    incomplete = docs.replace(
+        "temporary_suppressions = []",
+        'temporary_suppressions = [{ id = "broad", review_by = "2026-12-01" }]',
+    )
+    with pytest.raises(QualityPolicyError, match="scope and reason"):
+        check(incomplete, hooks, ci, today=date(2026, 11, 9))

@@ -27,6 +27,7 @@ full_gate = [
   "python scripts/check_skill.py",
 ]
 live_facts = "offline-audit-only"
+temporary_suppressions = []
 -->
 
 ## Current enforcement
