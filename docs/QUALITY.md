@@ -1,20 +1,19 @@
 # Quality policy and audit
 
-Audit date: 2026-11-02, using repository configuration, GitHub REST state, and
+Audit date: 2026-11-09, using repository configuration, GitHub REST state, and
 local configured checks.
 
 ## Current enforcement
 
-- The shared gate validates the skill with the pinned `skills-ref` reference CLI,
-  builds a wheel, installs it in a fresh environment, and runs that installed
-  CLI. `agnix` and repository-specific contract tests remain separate checks.
+- The shared gate checks agent metadata, shell and plist syntax, package build and
+  clean installation, repository-wide Ruff, pytest with branch coverage, strict
+  mypy, Bandit, pip-audit, the installed CLI, and the skill contract.
 - Pull-request CI rejects more than five commits, commits over 50 changed lines,
-  binary changes, and changes made directly on a protected branch name.
-- CI installs the locked Python 3.12 development environment, runs pytest with
-  branch coverage and a 67% minimum, scans source with Bandit, audits locked
-  dependencies with pip-audit, and smoke-tests the installed CLI.
-- The pre-commit configuration runs the same change-policy, pytest, Bandit, and
-  pip-audit commands. Hook installation is not automated or verified yet.
+  pull requests over 250 changed lines, binary changes, branches without an issue
+  reference, closed issue references, and contradictory risk declarations.
+- CI installs the locked Python 3.12 environment and invokes the same shared gate
+  used by the pre-push hook. The staged hook runs the faster change, agent-config,
+  and Ruff checks.
 - CI also runs the security checks every Monday at 05:23 UTC. GitHub Actions use
   commit-pinned actions and read-only repository permissions.
 
