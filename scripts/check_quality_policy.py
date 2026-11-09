@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import tomllib
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import cast
 
@@ -28,7 +29,7 @@ def inventory(document: str) -> dict[str, object]:
     return tomllib.loads(matches[0])
 
 
-def check(document: str, hook_config: str, ci_config: str) -> None:
+def check(document: str, hook_config: str, ci_config: str, *, today: date | None = None) -> None:
     """Compare documented tier ownership with local executable entrypoints."""
     policy = inventory(document)
     hooks = dict(HOOK.findall(hook_config))
@@ -56,6 +57,21 @@ def check(document: str, hook_config: str, ci_config: str) -> None:
     if policy.get("live_facts") != "offline-audit-only":
         message = "live facts must remain outside the offline gate"
         raise QualityPolicyError(message)
+    current = today or datetime.now(tz=UTC).date()
+    suppressions = cast("list[dict[str, str]]", policy.get("temporary_suppressions", []))
+    for suppression in suppressions:
+        identity = suppression.get("id", "unnamed")
+        if not suppression.get("scope") or not suppression.get("reason"):
+            message = f"temporary suppression {identity} requires scope and reason"
+            raise QualityPolicyError(message)
+        try:
+            review = date.fromisoformat(suppression["review_by"])
+        except (KeyError, ValueError) as error:
+            message = f"temporary suppression {identity} has invalid review date"
+            raise QualityPolicyError(message) from error
+        if review < current:
+            message = f"temporary suppression {identity} expired on {review.isoformat()}"
+            raise QualityPolicyError(message)
 
 
 def main() -> int:

@@ -27,6 +27,7 @@ full_gate = [
   "python scripts/check_skill.py",
 ]
 live_facts = "offline-audit-only"
+temporary_suppressions = []
 -->
 
 ## Current enforcement
@@ -44,6 +45,10 @@ live_facts = "offline-audit-only"
   commit-pinned actions and read-only repository permissions.
 - The embedded inventory above is the checked source of truth for local tier
   ownership. `scripts.check_quality_policy` rejects drift without network access.
+- Temporary suppressions must be registered in `temporary_suppressions` with a
+  narrow scope, reason, and ISO review date. The full gate rejects incomplete or
+  expired entries with their identity and deadline. No temporary suppression is
+  currently active.
 
 ## Coverage policy
 
@@ -54,20 +59,20 @@ storage, and migration paths are exercised across module boundaries; another dif
 coverage owner would not replace that system evidence. Future increases require a
 new measured baseline. Coverage remains supporting evidence, not a correctness goal.
 
-## Gaps observed
+## Foundation status
 
-- The clean-checkout setup and hook bootstrap remain tracked by
+- Clean-checkout setup and hook bootstrap are delivered by
   [#110](https://github.com/fosghen/agent-retro/issues/110).
-- Explicit quality tiers and expiring suppressions remain tracked by
-  [#112](https://github.com/fosghen/agent-retro/issues/112).
-- The shared content gate delivered by #111 is complete; Ruff and strict mypy
-  delivered by #9 and #10 are blocking parts of that gate.
+- The shared content gate delivered by #111 remains authoritative; Ruff and
+  strict mypy delivered by #9 and #10 are blocking parts of that gate.
+- The checked tier inventory and expiring suppression mechanism complete #112.
 
-## Remaining target gate
+## Tier ownership
 
-The remaining children of [#13](https://github.com/fosghen/agent-retro/issues/13)
-are #110 and #112. The authoritative full command already exists and CI invokes
-it; setup and tier ownership remain incomplete until those children close.
+Staged hooks own fast branch, configuration, and formatting feedback. Pre-push
+owns clean publication state and the complete local gate. CI invokes that same
+gate and remains authoritative. These tiers complete the children of
+[#13](https://github.com/fosghen/agent-retro/issues/13).
 
 Suppressions must remain narrow and justified. New checks must fix causes rather
 than weaken thresholds to hide existing violations.
