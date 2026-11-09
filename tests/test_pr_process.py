@@ -34,6 +34,9 @@ class PullRequestProcessTests(unittest.TestCase):
     def test_low_risk_skips_independent_review(self) -> None:
         check(f"{declaration()}{TRIGGERS}", BRANCH)
 
+    def test_low_risk_allows_disclosed_reversible_administration(self) -> None:
+        check(f"{declaration(effects='reversible-administration')}{TRIGGERS}", BRANCH)
+
     def test_high_risk_requires_trigger_and_completed_review(self) -> None:
         body = TRIGGERS.replace("- [ ] concurrency", "- [x] concurrency")
         declared = declaration(risk="high", review="completed", provider="human")
@@ -55,6 +58,11 @@ class PullRequestProcessTests(unittest.TestCase):
         declared = declaration(risk="high", review="completed", provider="model")
         with self.assertRaisesRegex(ProcessDeclarationError, "model review usage"):
             check(f"{declared}{body}", BRANCH)
+
+    def test_destructive_external_effect_requires_high_risk_review(self) -> None:
+        declared = declaration(effects="destructive-or-product-facing")
+        with self.assertRaisesRegex(ProcessDeclarationError, "external effects"):
+            check(f"{declared}{TRIGGERS}", BRANCH)
 
     def test_rejects_unnecessary_low_risk_review(self) -> None:
         declared = declaration(review="completed", provider="human")
