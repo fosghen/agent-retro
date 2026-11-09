@@ -64,8 +64,19 @@ installation:
 ./scripts/install_launchd.sh status
 ```
 
-Locked upgrades with drift detection remain tracked by
-[#115](https://github.com/fosghen/agent-retro/issues/115).
+Upgrade from the checkout for the selected release. The command verifies the
+installed checkout against its source, revision, and tracked-content hash before
+switching any managed artifact. Local changes stop the upgrade; commit, discard,
+or preserve them in another checkout before retrying:
+
+```bash
+cd "$HOME/agent-retro-selected-release"
+uv sync --locked --all-groups
+./scripts/install_launchd.sh upgrade
+```
+
+After the command succeeds, this selected release checkout is the new canonical
+source and must remain at that path while installed.
 
 ## Usage
 

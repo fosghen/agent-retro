@@ -6,7 +6,7 @@ import subprocess  # nosec B404
 import sys
 from pathlib import Path
 
-from scripts.install_manager import install, uninstall
+from scripts.install_manager import install, uninstall, upgrade
 from scripts.install_status import inspect
 
 
@@ -24,9 +24,9 @@ def execute(command: tuple[str, ...]) -> int:
 
 def main(arguments: list[str]) -> int:
     """Dispatch one explicit lifecycle action."""
-    actions = {"install": install, "uninstall": uninstall}
+    actions = {"install": install, "uninstall": uninstall, "upgrade": upgrade}
     if len(arguments) != 1 or arguments[0] not in {*actions, "status"}:
-        sys.stderr.write("Usage: manage_install.py {install|status|uninstall}\n")
+        sys.stderr.write("Usage: manage_install.py {install|status|uninstall|upgrade}\n")
         return 2
     root = Path(__file__).resolve().parents[1]
     if arguments[0] == "status":

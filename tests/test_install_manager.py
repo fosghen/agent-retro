@@ -119,7 +119,7 @@ def test_shell_entrypoint_loads_from_any_directory(tmp_path: Path) -> None:
     )
 
     assert result.returncode == INPUT_ERROR
-    assert result.stderr == "Usage: manage_install.py {install|status|uninstall}\n"
+    assert result.stderr == "Usage: manage_install.py {install|status|uninstall|upgrade}\n"
 
     status = subprocess.run(  # noqa: S603 -- fixed supported entrypoint
         ["/bin/sh", str(ROOT / "scripts/install_launchd.sh"), "status"],
@@ -141,10 +141,11 @@ def test_readme_uses_supported_install_lifecycle() -> None:
         'cd "$HOME/agent-retro-src"',
         "uv sync --locked --all-groups",
         "./scripts/install_launchd.sh install",
+        "./scripts/install_launchd.sh upgrade",
         "./scripts/install_launchd.sh uninstall",
     )
     assert all(command in readme for command in commands)
     assert "canonical source" in readme
     assert "unmanaged" in readme
     assert "./scripts/install_launchd.sh status" in readme
-    assert "#115" in readme
+    assert "selected release checkout" in readme
