@@ -57,9 +57,15 @@ cd "$HOME/agent-retro-src"
 
 Start a new Codex session if `agent-retro` is not immediately listed among the available skills.
 Claude Code-specific installation and runtime behavior are outside the project's release guarantees.
-Installed-version and schedule-health reporting remain tracked by
-[#114](https://github.com/fosghen/agent-retro/issues/114); locked upgrades with
-drift detection remain tracked by [#115](https://github.com/fosghen/agent-retro/issues/115).
+Inspect source, CLI, skill, lock, and daily schedule health without changing the
+installation:
+
+```bash
+./scripts/install_launchd.sh status
+```
+
+Locked upgrades with drift detection remain tracked by
+[#115](https://github.com/fosghen/agent-retro/issues/115).
 
 ## Usage
 
