@@ -10,12 +10,22 @@ from pathlib import Path
 
 RISK = re.compile(r"(?m)^Risk: (low|high)$")
 REVIEW = re.compile(r"(?m)^Independent review: (not-used|completed)$")
+PROVIDER = re.compile(r"(?m)^Review provider: (none|human|model)$")
+MODEL_USAGE = re.compile(r"(?m)^Model review usage: (.+)$")
+EXTERNAL_EFFECTS = re.compile(
+    r"(?m)^External effects: (none|reversible-administration|"
+    r"destructive-or-product-facing)$",
+)
+EXACT_MODEL_USAGE = re.compile(
+    r"(?:unavailable|tokens=[0-9]+; cost=(?:unavailable|USD [0-9]+(?:\.[0-9]+)?))",
+)
 HIGH_RISK_TRIGGERS = (
     "data migration or persisted-schema change",
     "concurrency, locking, or transaction-boundary change",
     "privacy, security, authentication, or authorization change",
     "destructive operation or external side effect",
     "unresolved correctness uncertainty after self-review",
+    "explicit user request for independent review",
 )
 ISSUE_BRANCH = re.compile(r"(?:^|/)issue-([1-9][0-9]*)(?:-|$)")
 
@@ -37,16 +47,30 @@ def check(body: str, branch: str) -> None:
         raise ProcessDeclarationError(message)
     risk_matches = RISK.findall(body)
     review_matches = REVIEW.findall(body)
-    if len(risk_matches) != 1 or len(review_matches) != 1:
-        message = "declare exactly one risk and review status"
+    provider_matches = PROVIDER.findall(body)
+    usage_matches = MODEL_USAGE.findall(body)
+    effect_matches = EXTERNAL_EFFECTS.findall(body)
+    declarations = (risk_matches, review_matches, provider_matches, usage_matches, effect_matches)
+    if any(len(matches) != 1 for matches in declarations):
+        message = "declare exactly one risk, review, provider, usage, and external effect"
         raise ProcessDeclarationError(message)
     risk, review = risk_matches[0], review_matches[0]
+    provider, usage, effects = provider_matches[0], usage_matches[0], effect_matches[0]
     triggers = [label for label in HIGH_RISK_TRIGGERS if checked(body, label)]
-    if risk == "low" and (review != "not-used" or triggers):
+    if risk == "low" and (review != "not-used" or provider != "none" or triggers):
         message = "low-risk PRs must skip independent review and triggers"
         raise ProcessDeclarationError(message)
-    if risk == "high" and (review != "completed" or not triggers):
+    if risk == "high" and (review != "completed" or provider == "none" or not triggers):
         message = "high-risk PRs require a trigger and completed review"
+        raise ProcessDeclarationError(message)
+    if provider == "model" and EXACT_MODEL_USAGE.fullmatch(usage) is None:
+        message = "model review usage must be exact or unavailable"
+        raise ProcessDeclarationError(message)
+    if provider != "model" and usage != "not-applicable":
+        message = "model review usage applies only to model review"
+        raise ProcessDeclarationError(message)
+    if effects == "destructive-or-product-facing" and risk != "high":
+        message = "destructive external effects require high risk"
         raise ProcessDeclarationError(message)
 
 
