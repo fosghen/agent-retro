@@ -91,7 +91,8 @@ destructive/product-facing.
 
 Repository files establish the local gate and CI inventory. GitHub REST establishes
 the dated live branch-protection facts; those facts cannot be proven by an offline
-content check and retain this dated audit procedure. The audit did not repeat setup
-from a clean checkout or validate the
-macOS LaunchAgent lifecycle in hosted CI. pip-audit checks locked third-party
+content check and retain this dated audit procedure. macOS CI validates install,
+repeat install, observable artifacts, and uninstall in a temporary HOME. It stubs
+`launchctl`, so actual per-user service registration remains a real-system
+boundary. pip-audit checks locked third-party
 dependencies but skips the unpublished local `agent-retro` package.

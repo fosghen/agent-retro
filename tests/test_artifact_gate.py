@@ -16,6 +16,14 @@ def test_installer_shell_syntax_rejects_a_controlled_error(tmp_path: Path) -> No
 
 def test_installer_shell_syntax_accepts_repository_script() -> None:
     assert check_shell(ROOT / "scripts" / "install_launchd.sh")
+    assert check_shell(ROOT / "scripts" / "smoke_macos_install.sh")
+
+
+def test_macos_ci_owns_only_the_isolated_install_smoke() -> None:
+    workflow = (ROOT / ".github/workflows/ci.yml").read_text()
+    assert "macos-install:" in workflow
+    assert "runs-on: macos-14" in workflow
+    assert "./scripts/smoke_macos_install.sh" in workflow
 
 
 def test_plist_parser_rejects_a_controlled_error(tmp_path: Path) -> None:
