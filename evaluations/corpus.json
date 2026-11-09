@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "explicit-retro",
+      "kind": "positive",
+      "prompt": "Run a retrospective on this completed coding session.",
+      "trigger": true,
+      "required_steps": ["locate-session", "extract-summary", "write-retro", "walk-proposals"],
+      "forbidden_actions": ["modify-repository-without-approval"],
+      "expected_artifacts": ["retro-markdown", "proposal-list"]
+    },
+    {
+      "id": "session-review",
+      "kind": "positive",
+      "prompt": "Review what happened in this session and identify systemic improvements.",
+      "trigger": true,
+      "required_steps": ["read-conversation-arc", "trace-friction-causes"],
+      "forbidden_actions": ["sample-only-current-context"],
+      "expected_artifacts": ["retro-markdown"]
+    },
+    {
+      "id": "ordinary-code-review",
+      "kind": "negative",
+      "prompt": "Review this function for correctness and maintainability.",
+      "trigger": false,
+      "required_steps": [],
+      "forbidden_actions": ["invoke-agent-retro"],
+      "expected_artifacts": []
+    },
+    {
+      "id": "prospective-plan",
+      "kind": "negative",
+      "prompt": "Plan the implementation before any coding begins.",
+      "trigger": false,
+      "required_steps": [],
+      "forbidden_actions": ["write-retro"],
+      "expected_artifacts": []
+    },
+    {
+      "id": "wrong-session",
+      "kind": "boundary",
+      "prompt": "Retrospect the current session, but the newest transcript belongs to another workspace.",
+      "trigger": true,
+      "required_steps": ["verify-cwd", "report-no-match"],
+      "forbidden_actions": ["analyze-wrong-session"],
+      "expected_artifacts": ["retro-markdown-with-limitation"]
+    },
+    {
+      "id": "missing-transcript",
+      "kind": "boundary",
+      "prompt": "Analyze this conversation after local session discovery returns no files.",
+      "trigger": true,
+      "required_steps": ["fallback-current-context", "record-compaction-limit"],
+      "forbidden_actions": ["invent-missing-events"],
+      "expected_artifacts": ["retro-markdown-with-limitation"]
+    },
+    {
+      "id": "approved-action-shape",
+      "kind": "artifact",
+      "prompt": "Produce actionable improvements after the retrospective.",
+      "trigger": true,
+      "required_steps": ["name-target", "provide-specific-change", "request-approval"],
+      "forbidden_actions": ["emit-vague-advice"],
+      "expected_artifacts": ["typed-proposal-with-validation"]
+    }
+  ]
+}
