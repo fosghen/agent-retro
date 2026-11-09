@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import re
-import subprocess
+
+# CompletedProcess is type-only; this module never executes a command.
+import subprocess  # nosec B404
 from collections.abc import Callable
 from importlib.metadata import version
 from typing import TYPE_CHECKING

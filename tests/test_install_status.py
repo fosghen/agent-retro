@@ -70,3 +70,13 @@ def test_status_reports_missing_components_without_queries(tmp_path: Path) -> No
         "lock: missing; locked upgrade unavailable",
         "launchagent: missing; run install",
     )
+
+
+def test_status_makes_cli_version_mismatch_actionable(tmp_path: Path) -> None:
+    root, home = source(tmp_path), tmp_path / "home"
+    cli = home / ".local/bin/agent-retro"
+    cli.parent.mkdir(parents=True)
+    cli.symlink_to(root / ".venv/bin/agent-retro")
+
+    status = inspect(root, home, lambda command: completed(command, output="0.1.0\n"))
+    assert status[1] == "cli: mismatch installed=0.1.0 source=0.2.0; reinstall"

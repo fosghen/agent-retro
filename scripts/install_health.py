@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 import os
 import plistlib
-import subprocess
+
+# CompletedProcess is type-only; this module never executes a command.
+import subprocess  # nosec B404
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
