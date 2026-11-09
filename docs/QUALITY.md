@@ -19,6 +19,7 @@ full_gate = [
   "python scripts/check_package.py",
   "python scripts/check_ruff.py",
   "python -m scripts.check_puzzles",
+  "python scripts/check_extractor_architecture.py",
   "pytest",
   "mypy --strict src/agent_retro scripts",
   "bandit -q -r src scripts",
@@ -33,7 +34,7 @@ temporary_suppressions = []
 ## Current enforcement
 
 - The shared gate checks agent metadata, shell and plist syntax, package build and
-  clean installation, repository-wide Ruff, pytest with branch coverage, strict
+  clean installation, extractor architecture, repository-wide Ruff, pytest with branch coverage, strict
   mypy, Bandit, pip-audit, the installed CLI, and the skill contract.
 - Pull-request CI rejects more than five commits, commits over 75 changed lines,
   pull requests over 250 changed lines, binary changes, branches without an issue
