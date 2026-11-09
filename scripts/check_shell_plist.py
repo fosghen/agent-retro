@@ -40,7 +40,8 @@ def check_plist(template: Path) -> bool:
 
 def main() -> int:
     """Run both LaunchAgent artifact checks."""
-    if not check_shell(ROOT / "scripts" / "install_launchd.sh"):
+    scripts = ("install_launchd.sh", "smoke_macos_install.sh")
+    if not all(check_shell(ROOT / "scripts" / script) for script in scripts):
         return 1
     return 0 if check_plist(ROOT / "launchd" / "com.fosghen.agent-retro.plist.in") else 1
 

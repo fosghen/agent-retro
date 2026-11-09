@@ -286,3 +286,6 @@ Posture: <auto mode? terse? ask-before-act?>
 Fill both prompts with session-specific content drawn from the evolution doc, specs, and user voice excerpts. Offer the user both options at the end of the walk-through — copy-paste ready.
 
 **Why both**: sometimes the user wants to keep momentum (compact); sometimes a hard reset is cleaner (clear). Don't pick for them.
+
+Repository maintainers validate the supported macOS install lifecycle with
+`scripts/smoke_macos_install.sh`; it always uses an isolated temporary home.
