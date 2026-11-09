@@ -5,7 +5,9 @@ from __future__ import annotations
 import os
 import plistlib
 from collections.abc import Callable
-from pathlib import Path  # noqa: TC003 -- runtime path construction is intentionally local
+from pathlib import Path
+
+from scripts.install_lock import LOCK_PATH, LockError, read, snapshot, write
 
 LABEL = "com.fosghen.agent-retro"
 Execute = Callable[[tuple[str, ...]], int]
@@ -35,8 +37,27 @@ def _domain() -> str:
     return f"gui/{os.getuid()}"
 
 
-def install(root: Path, home: Path, execute: Execute) -> None:
-    """Install repeatable links and a LaunchAgent from one source checkout."""
+def _require_installed(root: Path, home: Path) -> None:
+    links = {
+        home / ".codex/skills/agent-retro": root,
+        home / ".local/bin/agent-retro": root / ".venv/bin/agent-retro",
+    }
+    if any(
+        not target.is_symlink() or target.resolve() != source.resolve()
+        for target, source in links.items()
+    ):
+        raise InstallError("installed links do not match lock source")  # noqa: EM101, TRY003
+    plist = home / f"Library/LaunchAgents/{LABEL}.plist"
+    expected = [str(root / ".venv/bin/python"), str(root / "scripts/daily_codex_retro.py")]
+    try:
+        arguments = plistlib.loads(plist.read_bytes()).get("ProgramArguments")
+    except (OSError, plistlib.InvalidFileException, ValueError) as error:
+        raise InstallError(f"unmanaged path: {plist}") from error  # noqa: EM102, TRY003
+    if arguments != expected:
+        raise InstallError(f"unmanaged path: {plist}")  # noqa: EM102, TRY003
+
+
+def _validate(root: Path, execute: Execute) -> None:
     python = root / ".venv/bin/python"
     cli = root / ".venv/bin/agent-retro"
     script = root / "scripts/daily_codex_retro.py"
@@ -46,6 +67,14 @@ def install(root: Path, home: Path, execute: Execute) -> None:
     validator = root / ".venv/bin/skills-ref"
     if execute((str(validator), "validate", str(root))):
         raise InstallError("skill validation failed")  # noqa: EM101, TRY003
+
+
+def install(root: Path, home: Path, execute: Execute) -> None:
+    """Install repeatable links and a LaunchAgent from one source checkout."""
+    _validate(root, execute)
+    python = root / ".venv/bin/python"
+    cli = root / ".venv/bin/agent-retro"
+    script = root / "scripts/daily_codex_retro.py"
     _link(home / ".codex/skills/agent-retro", root)
     _link(home / ".local/bin/agent-retro", cli)
     plist = home / f"Library/LaunchAgents/{LABEL}.plist"
@@ -61,6 +90,23 @@ def install(root: Path, home: Path, execute: Execute) -> None:
     execute(("launchctl", "bootout", f"{_domain()}/{LABEL}"))
     if execute(("launchctl", "bootstrap", _domain(), str(plist))):
         raise InstallError("LaunchAgent bootstrap failed")  # noqa: EM101, TRY003
+    write(home, snapshot(root))
+
+
+def upgrade(root: Path, home: Path, execute: Execute) -> None:
+    """Switch a drift-free installation to the checkout selected by the caller."""
+    try:
+        locked = read(home)
+        current = Path(locked["source"])
+        observed = snapshot(current)
+    except LockError as error:
+        raise InstallError(str(error)) from error
+    if observed != locked:
+        raise InstallError("local drift detected")  # noqa: EM101, TRY003
+    _require_installed(current, home)
+    _validate(root, execute)
+    uninstall(current, home, execute)
+    install(root, home, execute)
 
 
 def uninstall(root: Path, home: Path, execute: Execute) -> None:
@@ -75,3 +121,4 @@ def uninstall(root: Path, home: Path, execute: Execute) -> None:
             raise InstallError(f"unmanaged path: {plist}")  # noqa: EM102, TRY003
         execute(("launchctl", "bootout", f"{_domain()}/{LABEL}"))
         plist.unlink()
+    (home / LOCK_PATH).unlink(missing_ok=True)
