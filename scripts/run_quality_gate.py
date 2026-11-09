@@ -21,6 +21,7 @@ def commands(uv: str) -> tuple[tuple[str, ...], ...]:
         (*prefix, "mypy", "--strict", "src/agent_retro", "scripts"),
         (*prefix, "bandit", "-q", "-r", "src", "scripts"),
         (*prefix, "pip-audit"),
+        (*prefix, "python", "-m", "scripts.check_quality_policy"),
         (*prefix, "agent-retro", "--help"),
         (*prefix, "python", "scripts/check_skill.py"),
     )

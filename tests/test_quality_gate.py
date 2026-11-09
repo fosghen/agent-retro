@@ -15,7 +15,7 @@ class QualityGateTests(unittest.TestCase):
 
     def test_commands_are_complete_and_deterministic(self) -> None:
         result = commands("/bin/uv")
-        self.assertEqual(len(result), 11)
+        self.assertEqual(len(result), 12)
         self.assertEqual(result[0][-2:], ("python", "scripts/check_agent_config.py"))
         self.assertEqual(result[1][-2:], ("python", "scripts/check_shell_plist.py"))
         self.assertEqual(result[2][-2:], ("python", "scripts/check_package.py"))
