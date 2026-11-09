@@ -78,6 +78,19 @@ gate and remains authoritative. These tiers complete the children of
 Suppressions must remain narrow and justified. New checks must fix causes rather
 than weaken thresholds to hide existing violations.
 
+## Dependency updates
+
+Dependabot checks the root `uv` project and commit-pinned GitHub Actions every
+Monday. Routine Python minor and patch updates are grouped, Action updates are
+grouped separately, and at most three version-update pull requests may be open.
+Every proposal uses the normal protected CI and requires manual merge; immutable
+Action SHA pinning must remain visible in the diff.
+
+Emergency dependency updates do not wait for the weekly cadence. A maintainer
+triggers Dependabot immediately or prepares a focused lock update, records the
+advisory in the pull request, and runs the same protected gate. Security and
+routine updates are never auto-merged.
+
 ## Repository enforcement
 
 Live GitHub protection requires a current branch and the `quality` check, applies
