@@ -55,6 +55,16 @@ Development must follow this order:
    --branch "$(git branch --show-current)"` before publishing it through `gh api`.
    Publish one focused PR whose `Closes #N` matches the branch issue.
 
+### Deferred executable work
+
+When implementation discovers out-of-scope executable work, create a separate
+open GitHub issue before deferring it. A code marker must use
+`TODO(#123, estimate:2h): explanation` or the equivalent `FIXME` form, reference
+that open issue, give an estimate from 1 minute through 30 days, and provide a
+specific explanation. Bare `TODO` and `FIXME` markers are forbidden. Completing
+the linked issue must remove its marker. Documentation-only work and
+non-executable scaffolding do not require red-green TDD or invented puzzle debt.
+
 Before granting a controlled agent commit or push authority, ensure its sandbox
 can write both the worktree and the path returned by `git rev-parse
 --git-common-dir`. Do not advertise authority that the execution boundary blocks.
