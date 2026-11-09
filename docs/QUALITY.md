@@ -3,6 +3,32 @@
 Audit date: 2026-11-09, using repository configuration, GitHub REST state, and
 local configured checks.
 
+<!-- quality-inventory
+staged_hooks = ["change-limits", "agent-config", "scoped-ruff"]
+pre_push_hooks = ["publication-readiness", "full-quality-gate"]
+ci_steps = [
+  "Check live issue state|python scripts/check_issue_state.py",
+  "Check pull request process declaration|python scripts/check_pr_process.py",
+  "Check pull request limits|python scripts/check_change_limits.py",
+  "Run full quality gate|python scripts/run_quality_gate.py",
+]
+full_gate = [
+  "python scripts/check_agent_config.py",
+  "python -m scripts.check_quality_policy",
+  "python scripts/check_shell_plist.py",
+  "python scripts/check_package.py",
+  "python scripts/check_ruff.py",
+  "python -m scripts.check_puzzles",
+  "pytest",
+  "mypy --strict src/agent_retro scripts",
+  "bandit -q -r src scripts",
+  "pip-audit",
+  "agent-retro --help",
+  "python scripts/check_skill.py",
+]
+live_facts = "offline-audit-only"
+-->
+
 ## Current enforcement
 
 - The shared gate checks agent metadata, shell and plist syntax, package build and
@@ -16,6 +42,8 @@ local configured checks.
   and Ruff checks.
 - CI also runs the security checks every Monday at 05:23 UTC. GitHub Actions use
   commit-pinned actions and read-only repository permissions.
+- The embedded inventory above is the checked source of truth for local tier
+  ownership. `scripts.check_quality_policy` rejects drift without network access.
 
 ## Coverage policy
 
@@ -58,6 +86,7 @@ destructive/product-facing.
 
 Repository files establish the local gate and CI inventory. GitHub REST establishes
 the dated live branch-protection facts; those facts cannot be proven by an offline
-content check. The audit did not repeat setup from a clean checkout or validate the
+content check and retain this dated audit procedure. The audit did not repeat setup
+from a clean checkout or validate the
 macOS LaunchAgent lifecycle in hosted CI. pip-audit checks locked third-party
 dependencies but skips the unpublished local `agent-retro` package.

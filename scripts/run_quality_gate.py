@@ -13,6 +13,7 @@ def commands(uv: str) -> tuple[tuple[str, ...], ...]:
     prefix = (uv, "run", "--frozen", "--no-sync")
     return (
         (*prefix, "python", "scripts/check_agent_config.py"),
+        (*prefix, "python", "-m", "scripts.check_quality_policy"),
         (*prefix, "python", "scripts/check_shell_plist.py"),
         (*prefix, "python", "scripts/check_package.py"),
         (*prefix, "python", "scripts/check_ruff.py"),
