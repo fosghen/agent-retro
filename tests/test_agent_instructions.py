@@ -34,3 +34,16 @@ def test_verification_matches_the_change_type() -> None:
         "External integrations",
     ):
         assert contract in AGENT_INSTRUCTIONS
+
+
+def test_puzzle_debt_is_issue_backed() -> None:
+    """Deferred executable work must stay bounded, owned, and removable."""
+    for contract in (
+        "out-of-scope executable work",
+        "TODO(#123, estimate:2h): explanation",
+        "open GitHub issue",
+        "Bare `TODO` and `FIXME`",
+        "remove its marker",
+        "non-executable scaffolding",
+    ):
+        assert contract in AGENT_INSTRUCTIONS
