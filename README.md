@@ -147,6 +147,10 @@ uv sync --locked --all-groups
 uv run agent-retro --help
 ```
 
+## Security
+
+Report vulnerabilities privately according to [SECURITY.md](SECURITY.md).
+
 ## License
 
 MIT
