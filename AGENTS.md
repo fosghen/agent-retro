@@ -31,8 +31,18 @@ Development must follow this order:
    the work cannot fit one 250-line PR, or it contains independently deliverable
    high-risk components. Never manufacture a post-hoc split of one coherent diff.
 3. Create a branch containing `issue-N`, matching the registered issue number.
-4. Add focused failing tests, implement the smallest coherent change, and use
-   focused checks while editing.
+4. Match evidence to the change, then implement the smallest coherent change:
+   - Reproducible bug fixes start with a regression test that fails before the
+     fix and passes after it. Record the limitation when stable automation is
+     unavailable.
+   - New behavior is tested at the highest stable observable boundary, including
+     relevant failure paths.
+   - Refactors preserve characterization evidence without an artificial red phase.
+   - Documentation, policy, and build configuration use appropriate deterministic
+     validation rather than invented behavioral tests.
+   - External integrations use contract tests or emulators where practical and
+     keep unavailable real-system validation visible.
+   Use focused checks while editing.
 5. Self-review the complete diff. Independent review is not a routine quality
    gate and PR size alone is never a reason to request it.
 6. Create the logical commits, then run `uv run --frozen --no-sync python -m
