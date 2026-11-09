@@ -60,8 +60,8 @@ def main() -> int:
     except (OSError, RuntimeError, UnicodeError) as error:
         print(f"puzzle policy failed: {error}", file=sys.stderr)  # noqa: T201
         return 1
-    for error in errors:
-        print(error, file=sys.stderr)  # noqa: T201
+    for violation in errors:
+        print(violation, file=sys.stderr)  # noqa: T201
     return bool(errors)
 
 

@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  issues: read
 
 jobs:
   quality:
@@ -45,6 +46,8 @@ jobs:
           HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
         run: python scripts/check_change_limits.py --branch "$HEAD_BRANCH" --range "$BASE_SHA" "$HEAD_SHA"
       - name: Run full quality gate
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           uv sync --locked --all-groups
           uv run --frozen --no-sync python scripts/run_quality_gate.py

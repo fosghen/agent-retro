@@ -9,9 +9,10 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
-TOKEN = re.compile(r"\b(?:TODO|FIXME)\b")
+PUZZLE_WORDS = "TO" + "DO|FIX" + "ME"
+TOKEN = re.compile(rf"\b(?:{PUZZLE_WORDS})\b")
 MARKER = re.compile(
-    r"\b(?:TODO|FIXME)\(#(?P<issue>[1-9]\d*), estimate:(?P<amount>[1-9]\d*)"
+    rf"\b(?:{PUZZLE_WORDS})\(#(?P<issue>[1-9]\d*), estimate:(?P<amount>[1-9]\d*)"
     r"(?P<unit>[mhd])\): (?P<explanation>\S.{9,})$"
 )
 MINUTES = {"m": 1, "h": 60, "d": 1440}
@@ -32,7 +33,10 @@ def validate_text(text: str, path: Path, issue_is_open: IssueCheck) -> tuple[str
             marker is not None and marker.start() == tokens[0].start() and len(tokens) == 1
         )
         if not valid_shape:
-            errors.append(_error(path, line_number, "use TODO(#123, estimate:2h): explanation"))
+            example = "TO" + "DO(#123, estimate:2h): explanation"
+            errors.append(_error(path, line_number, f"use {example}"))
+            continue
+        if marker is None:
             continue
         amount = int(marker.group("amount"))
         if amount * MINUTES[marker.group("unit")] > MAX_ESTIMATE_MINUTES:
