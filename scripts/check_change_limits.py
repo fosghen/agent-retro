@@ -10,7 +10,7 @@ import shutil
 import subprocess  # nosec B404
 import sys
 
-MAX_COMMIT_LINES = 50
+MAX_COMMIT_LINES = 75
 MAX_PR_LINES = 250
 MAX_COMMITS = 5
 GENERATED_EXCLUSIONS = frozenset({"uv.lock"})

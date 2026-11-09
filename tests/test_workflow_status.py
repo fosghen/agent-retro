@@ -68,9 +68,9 @@ class WorkflowStatusTests(unittest.TestCase):
         responses = {
             ("git", "status", "--porcelain"): "",
             ("git", "rev-list", "--reverse", "origin/main..HEAD"): "abc",
-            ("git", "show", "--format=", "--numstat", "abc"): "51\t0\tfile.py",
+            ("git", "show", "--format=", "--numstat", "abc"): "76\t0\tfile.py",
         }
-        with self.assertRaisesRegex(WorkflowStatusError, "51 changed lines"):
+        with self.assertRaisesRegex(WorkflowStatusError, "76 changed lines"):
             require_publication_ready(
                 "feature/issue-102-status", lambda tool, *args: responses[(tool, *args)]
             )
@@ -85,7 +85,7 @@ class WorkflowStatusTests(unittest.TestCase):
         self.assertEqual(status["pr_state"], "OPEN")
         self.assertEqual(status["commits"], 2)
         self.assertEqual(status["changed_lines"], 50)
-        self.assertEqual(status["remaining"], {"commit_lines": 40, "commits": 3, "pr_lines": 200})
+        self.assertEqual(status["remaining"], {"commit_lines": 65, "commits": 3, "pr_lines": 200})
         self.assertNotIn(" ", encode(status))
 
     def test_reports_missing_issue_branch_before_other_queries(self) -> None:
