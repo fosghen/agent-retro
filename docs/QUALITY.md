@@ -19,36 +19,32 @@ local configured checks.
 
 ## Gaps observed
 
-- Ruff formatting and linting are not enforced ([#9](https://github.com/fosghen/agent-retro/issues/9)).
-- Strict mypy covers the application and deterministic scripts through the shared
-  publication gate used by pre-push and CI.
-- There is no single local gate or verified hook bootstrap
-  ([#13](https://github.com/fosghen/agent-retro/issues/13)).
-- `main` has no branch protection or required `quality` status check
-  ([#14](https://github.com/fosghen/agent-retro/issues/14)).
+- The clean-checkout setup and hook bootstrap remain tracked by
+  [#110](https://github.com/fosghen/agent-retro/issues/110).
+- Explicit quality tiers and expiring suppressions remain tracked by
+  [#112](https://github.com/fosghen/agent-retro/issues/112).
+- The shared content gate delivered by #111 is complete; Ruff and strict mypy
+  delivered by #9 and #10 are blocking parts of that gate.
 
 ## Remaining target gate
 
-The complete gate tracked by [#13](https://github.com/fosghen/agent-retro/issues/13)
-must expose one setup command and one local command that CI also uses. Remaining
-work includes:
-
-1. Ruff format and lint ([#9](https://github.com/fosghen/agent-retro/issues/9));
-2. strict mypy across application and deterministic scripts ([#10](https://github.com/fosghen/agent-retro/issues/10)).
+The remaining children of [#13](https://github.com/fosghen/agent-retro/issues/13)
+are #110 and #112. The authoritative full command already exists and CI invokes
+it; setup and tier ownership remain incomplete until those children close.
 
 Suppressions must remain narrow and justified. New checks must fix causes rather
 than weaken thresholds to hide existing violations.
 
 ## Repository enforcement
 
-Planned under [#14](https://github.com/fosghen/agent-retro/issues/14): protect
-`main`, require current branches and the `quality` check, block force pushes and
-deletion, and apply the rules to administrators. Review remains optional.
+Live GitHub protection requires a current branch and the `quality` check, applies
+to administrators, resolves conversations, and blocks force pushes and deletion.
+Independent review remains risk-based rather than universally required.
 
 ## Audit limitations
 
-This audit inspected repository configuration at the dated `main` revision and
-ran the configured checks on macOS. It did not repeat setup from a clean checkout
-or validate Linux-specific behavior. GitHub REST reported that `main` was
-unprotected; organization-level rulesets were not assumed. pip-audit checks locked
-third-party dependencies but skips the unpublished local `agent-retro` package.
+Repository files establish the local gate and CI inventory. GitHub REST establishes
+the dated live branch-protection facts; those facts cannot be proven by an offline
+content check. The audit did not repeat setup from a clean checkout or validate the
+macOS LaunchAgent lifecycle in hosted CI. pip-audit checks locked third-party
+dependencies but skips the unpublished local `agent-retro` package.
