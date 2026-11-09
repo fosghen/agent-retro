@@ -12,6 +12,9 @@ Closes #ISSUE
 
 Risk: low
 Independent review: not-used
+Review provider: none
+Model review usage: not-applicable
+External effects: none
 
 High-risk triggers:
 
@@ -20,7 +23,11 @@ High-risk triggers:
 - [ ] privacy, security, authentication, or authorization change
 - [ ] destructive operation or external side effect
 - [ ] unresolved correctness uncertainty after self-review
+- [ ] explicit user request for independent review
 
 <!-- Low risk requires no checked triggers and no independent review.
 High risk requires Risk: high, at least one checked trigger, and
-Independent review: completed. PR size alone is not a review trigger. -->
+Independent review: completed with provider human or model. PR size alone is
+not a trigger. External effects are none, reversible-administration, or
+destructive-or-product-facing. For model review, replace usage with unavailable
+or `tokens=N; cost=USD N`; never estimate missing evidence. -->

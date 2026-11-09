@@ -48,7 +48,11 @@ than weaken thresholds to hide existing violations.
 
 Live GitHub protection requires a current branch and the `quality` check, applies
 to administrators, resolves conversations, and blocks force pushes and deletion.
-Independent review remains risk-based rather than universally required.
+Independent review remains opt-in and risk-based. Routine low-risk changes rely
+on self-review plus protected deterministic CI; no workflow invokes a paid
+reviewer. The PR declaration records provider, available model usage evidence,
+and whether live external effects are absent, reversible administration, or
+destructive/product-facing.
 
 ## Audit limitations
 

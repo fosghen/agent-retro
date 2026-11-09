@@ -69,10 +69,16 @@ Before granting a controlled agent commit or push authority, ensure its sandbox
 can write both the worktree and the path returned by `git rev-parse
 --git-common-dir`. Do not advertise authority that the execution boundary blocks.
 
-Use independent review only when the PR changes persisted schemas or migrations,
-concurrency or transaction boundaries, privacy/security/authentication/
-authorization, destructive or external side effects, or when concrete
-correctness uncertainty remains after self-review. Declare the trigger in the PR.
+Routine low-risk work uses self-review and protected deterministic CI without a
+remote reviewer. Use independent human or explicitly selected model review only
+for a declared high-risk trigger, unresolved correctness uncertainty, or an
+explicit user request; PR size alone is never a trigger. No CI or schedule may
+invoke a paid reviewer automatically. When model review is used, record exact
+token and cost evidence when available and otherwise declare it unavailable.
+
+Declare live external effects in the PR. Reversible repository administration
+may remain low risk; destructive or product-facing effects require high risk and
+independent review. Do not weaken an applicable high-risk trigger to save tokens.
 
 Never commit directly to `main`. Each logical commit may contain at most 75
 changed lines, each PR at most 250 changed lines and 5 commits, and binary changes
