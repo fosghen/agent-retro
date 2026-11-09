@@ -17,6 +17,15 @@ local configured checks.
 - CI also runs the security checks every Monday at 05:23 UTC. GitHub Actions use
   commit-pinned actions and read-only repository permissions.
 
+## Coverage policy
+
+The protected gate measures line and branch coverage across the complete maintained
+Python scope and enforces an 85% floor against the observed 87.01% baseline. A
+repository-wide ratchet was selected over changed-line coverage because the parser,
+storage, and migration paths are exercised across module boundaries; another diff
+coverage owner would not replace that system evidence. Future increases require a
+new measured baseline. Coverage remains supporting evidence, not a correctness goal.
+
 ## Gaps observed
 
 - The clean-checkout setup and hook bootstrap remain tracked by
