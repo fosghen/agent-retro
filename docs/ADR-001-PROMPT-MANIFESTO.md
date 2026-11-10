@@ -36,3 +36,19 @@ correctness, user outcomes, privacy, or recoverability.
   become a second repository-development policy.
 - Issue #228 supplied the mechanical issue-backed puzzle check. Issue #60 is the
   existing place to reconsider broader prose and agent-guidance linting.
+
+## Enforcement and experiment
+
+No new checker is justified by this study. The accepted mechanical rules are
+already covered by the change-limit, puzzle, Ruff, mypy, pytest, coverage,
+Bandit, dependency-audit, and skill-validation gates. Duplicating them in a new
+script would add policy drift rather than enforcement.
+
+Broader prompt and prose linting remains an experiment under issue #60. It may
+be promoted only when measured false positives are low enough that maintainers
+do not routinely suppress correct guidance. Tool-specific requirements for GNU
+utilities, Courier, and BugScribe are rejected here because Agent Retro does not
+depend on those tools.
+
+Future manifesto changes are input to a new decision, not implicit policy. The
+reviewed source is [yegor256/prompt](https://github.com/yegor256/prompt/tree/4fb8a3f125b3481de01d489a170f56db29a83694).
