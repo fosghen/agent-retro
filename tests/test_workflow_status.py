@@ -54,7 +54,9 @@ def query(tool: str, *args: str) -> str:
 
 class WorkflowStatusTests(unittest.TestCase):
     def test_delivery_repository_prefers_override_then_push_origin(self) -> None:
-        query = lambda *_args: "https://github.com/fosghen/agent-retro.git"
+        def query(*_args: str) -> str:
+            return "https://github.com/fosghen/agent-retro.git"
+
         self.assertEqual(delivery_repository(query, {}), "fosghen/agent-retro")
         self.assertEqual(
             delivery_repository(query, {"GH_REPO": "owner/override"}), "owner/override"
