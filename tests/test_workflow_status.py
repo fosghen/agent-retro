@@ -7,6 +7,7 @@ from unittest.mock import patch
 from scripts.workflow_status import (
     WorkflowStatusError,
     collect,
+    delivery_repository,
     encode,
     execute,
     main,
@@ -15,10 +16,20 @@ from scripts.workflow_status import (
 
 RESPONSES = {
     ("git", "branch", "--show-current"): "feature/issue-102-status",
+    ("git", "remote", "get-url", "--push", "origin"): "git@github.com:fosghen/agent-retro.git",
     ("git", "rev-list", "--count", "origin/main..HEAD"): "2",
     ("git", "diff", "--numstat", "origin/main...HEAD"): "40\t10\tfile.py",
     ("git", "diff", "--cached", "--numstat"): "7\t3\tfile.py",
-    ("gh", "issue", "view", "102", "--json", "number,state"): '{"number":102,"state":"OPEN"}',
+    (
+        "gh",
+        "issue",
+        "view",
+        "102",
+        "--json",
+        "number,state",
+        "--repo",
+        "fosghen/agent-retro",
+    ): '{"number":102,"state":"OPEN"}',
     (
         "gh",
         "pr",
@@ -31,6 +42,8 @@ RESPONSES = {
         "1",
         "--json",
         "state",
+        "--repo",
+        "fosghen/agent-retro",
     ): '[{"state":"OPEN"}]',
 }
 
@@ -40,6 +53,15 @@ def query(tool: str, *args: str) -> str:
 
 
 class WorkflowStatusTests(unittest.TestCase):
+    def test_delivery_repository_prefers_override_then_push_origin(self) -> None:
+        def query(*_args: str) -> str:
+            return "https://github.com/fosghen/agent-retro.git"
+
+        self.assertEqual(delivery_repository(query, {}), "fosghen/agent-retro")
+        self.assertEqual(
+            delivery_repository(query, {"GH_REPO": "owner/override"}), "owner/override"
+        )
+
     def test_pre_push_owns_the_publication_gate(self) -> None:
         config = (Path(__file__).parents[1] / ".pre-commit-config.yaml").read_text()
         assert "python -m scripts.workflow_status --publication" in config
@@ -101,14 +123,32 @@ class WorkflowStatusTests(unittest.TestCase):
 
     def test_reports_mismatched_issue(self) -> None:
         responses = dict(RESPONSES)
-        key = ("gh", "issue", "view", "102", "--json", "number,state")
+        key = (
+            "gh",
+            "issue",
+            "view",
+            "102",
+            "--json",
+            "number,state",
+            "--repo",
+            "fosghen/agent-retro",
+        )
         responses[key] = '{"number":103,"state":"OPEN"}'
         with self.assertRaisesRegex(WorkflowStatusError, "absent"):
             collect(lambda tool, *args: responses[(tool, *args)])
 
     def test_reports_closed_issue(self) -> None:
         responses = dict(RESPONSES)
-        key = ("gh", "issue", "view", "102", "--json", "number,state")
+        key = (
+            "gh",
+            "issue",
+            "view",
+            "102",
+            "--json",
+            "number,state",
+            "--repo",
+            "fosghen/agent-retro",
+        )
         responses[key] = '{"number":102,"state":"CLOSED"}'
         with self.assertRaisesRegex(WorkflowStatusError, "must be open"):
             collect(lambda tool, *args: responses[(tool, *args)])
@@ -139,5 +179,5 @@ class WorkflowStatusTests(unittest.TestCase):
             [{"command": command, "output": output} for command, output in RESPONSES.items()],
             separators=(",", ":"),
         )
-        self.assertEqual(len(RESPONSES), 6)
+        self.assertEqual(len(RESPONSES), 7)
         self.assertLess(len(encode(status).encode()), len(separate_transcript.encode()))
