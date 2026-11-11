@@ -107,6 +107,25 @@ def test_install_without_proxy_keeps_path_only(
     }
 
 
+def test_install_routes_scheduler_output_to_preserved_logs(tmp_path: Path) -> None:
+    root, home = repository(tmp_path), tmp_path / "home"
+
+    install(root, home, lambda _command: 0)
+
+    logs = home / ".codex/logs"
+    plist = plistlib.loads(
+        (home / "Library/LaunchAgents/com.fosghen.agent-retro.plist").read_bytes()
+    )
+    assert logs.is_dir()
+    assert plist["StandardOutPath"] == str(logs / "daily-retro.log")
+    assert plist["StandardErrorPath"] == str(logs / "daily-retro.error.log")
+    (logs / "daily-retro.log").touch()
+
+    uninstall(root, home, lambda _command: 0)
+
+    assert (logs / "daily-retro.log").exists()
+
+
 def test_upgrade_rejects_drift_before_replacing_links(tmp_path: Path) -> None:
     old = repository(tmp_path / "old")
     selected = repository(tmp_path / "selected")
