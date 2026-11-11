@@ -105,6 +105,12 @@ Markdown report to `~/.codex/worklog/retros/YYYY-MM-DD-daily.md`. Scheduler logs
 stay local under `~/.codex/logs/`; session transcripts are never copied into the
 repository.
 
+Backfill one missed local day explicitly:
+
+```bash
+./scripts/daily_codex_retro.py --date 2026-11-06
+```
+
 ### Extraction script standalone
 
 The Python extraction script can be used independently:
