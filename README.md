@@ -117,13 +117,13 @@ The Python extraction script can be used independently:
 
 ```bash
 # Quick session verification (reads only first/last 64KB)
-python3 scripts/extract.py <session.jsonl> --metadata-only
+.venv/bin/python scripts/extract.py <session.jsonl> --metadata-only
 
 # Compact extraction (tool counts, no individual calls)
-python3 scripts/extract.py <session.jsonl> --summary
+.venv/bin/python scripts/extract.py <session.jsonl> --summary
 
 # Full extraction (includes every tool call detail)
-python3 scripts/extract.py <session.jsonl>
+.venv/bin/python scripts/extract.py <session.jsonl>
 ```
 
 ## How it works

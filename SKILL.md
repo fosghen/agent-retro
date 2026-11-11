@@ -45,7 +45,7 @@ ls -t ~/.claude/projects/<encoded-cwd>/*.jsonl | head -3
 
 **Verify the candidate.** Use `--metadata-only` for cheap verification:
 ```bash
-python3 <agent-retro-dir>/scripts/extract.py <candidate.jsonl> --metadata-only
+<agent-retro-dir>/.venv/bin/python <agent-retro-dir>/scripts/extract.py <candidate.jsonl> --metadata-only
 ```
 
 This returns session_id, cwd, git_branch, first_prompt, timestamps, and file size. Check `first_prompt` matches what was said at the start of the conversation.
@@ -55,7 +55,7 @@ If it doesn't match, try the next most recent file. If none match, state this in
 ### Run extraction
 
 ```bash
-python3 <agent-retro-dir>/scripts/extract.py <path-to-session.jsonl> --summary
+<agent-retro-dir>/.venv/bin/python <agent-retro-dir>/scripts/extract.py <path-to-session.jsonl> --summary
 ```
 
 Use `--summary` to get compact output (tool counts only, no individual call listings). If you need to drill into specific tool calls later, re-run without `--summary`.
