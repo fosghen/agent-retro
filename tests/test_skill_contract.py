@@ -3,7 +3,9 @@
 from pathlib import Path
 
 SKILL = (Path(__file__).resolve().parents[1] / "SKILL.md").read_text()
+README = (Path(__file__).resolve().parents[1] / "README.md").read_text()
 OPENAI_METADATA = Path(__file__).resolve().parents[1] / "agents" / "openai.yaml"
+EXPECTED_EXTRACT_COMMANDS = 2
 
 
 def test_metadata_describes_the_maintained_runtime() -> None:
@@ -25,6 +27,15 @@ def test_retro_output_uses_the_codex_worklog() -> None:
     """The canonical report belongs under the Codex worklog."""
     assert "~/.codex/worklog/retros/" in SKILL
     assert "~/.claude/worklog/retros/" not in SKILL
+
+
+def test_extraction_uses_the_checkout_managed_python() -> None:
+    """Extractor guidance must not depend on a globally installed package."""
+    managed = "<agent-retro-dir>/.venv/bin/python <agent-retro-dir>/scripts/extract.py"
+    assert SKILL.count(managed) == EXPECTED_EXTRACT_COMMANDS
+    assert "python3 <agent-retro-dir>/scripts/extract.py" not in SKILL
+    assert ".venv/bin/python scripts/extract.py" in README
+    assert "python3 scripts/extract.py" not in README
 
 
 def test_openai_metadata_matches_the_skill_contract() -> None:
