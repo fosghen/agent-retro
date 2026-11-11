@@ -11,6 +11,16 @@ from scripts.install_lock import LOCK_PATH, LockError, read, snapshot, write
 
 LABEL = "com.fosghen.agent-retro"
 Execute = Callable[[tuple[str, ...]], int]
+PROXY_VARIABLES = (
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "NO_PROXY",
+    "ALL_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "no_proxy",
+    "all_proxy",
+)
 
 
 class InstallError(RuntimeError):
@@ -35,6 +45,12 @@ def _unlink(target: Path, source: Path) -> None:
 
 def _domain() -> str:
     return f"gui/{os.getuid()}"
+
+
+def _environment() -> dict[str, str]:
+    environment = {"PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"}
+    environment.update((name, value) for name in PROXY_VARIABLES if (value := os.environ.get(name)))
+    return environment
 
 
 def _require_installed(root: Path, home: Path) -> None:
@@ -84,7 +100,7 @@ def install(root: Path, home: Path, execute: Execute) -> None:
         "ProgramArguments": [str(python), str(script)],
         "StartCalendarInterval": {"Hour": 9, "Minute": 0},
         "ProcessType": "Background",
-        "EnvironmentVariables": {"PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"},
+        "EnvironmentVariables": _environment(),
     }
     plist.write_bytes(plistlib.dumps(payload))
     execute(("launchctl", "bootout", f"{_domain()}/{LABEL}"))
