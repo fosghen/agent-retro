@@ -1,5 +1,6 @@
 import json
 import os
+import plistlib
 import subprocess
 from pathlib import Path
 
@@ -11,6 +12,16 @@ ROOT = Path(__file__).resolve().parents[1]
 INPUT_ERROR = 2
 REVISION_LENGTH = 40
 HASH_LENGTH = 64
+PROXY_VARIABLES = (
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "NO_PROXY",
+    "ALL_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "no_proxy",
+    "all_proxy",
+)
 
 
 def repository(tmp_path: Path) -> Path:
@@ -57,6 +68,43 @@ def test_install_is_repeatable_and_uses_canonical_source(tmp_path: Path) -> None
     assert lock["source"] == str(root.resolve())
     assert len(lock["revision"]) == REVISION_LENGTH
     assert len(lock["content_hash"]) == HASH_LENGTH
+
+
+def test_install_copies_only_nonempty_proxy_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name in PROXY_VARIABLES:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:8120")
+    monkeypatch.setenv("OPENAI_API_KEY", "must-not-be-copied")
+    home = tmp_path / "home"
+
+    install(repository(tmp_path), home, lambda _command: 0)
+
+    plist = plistlib.loads(
+        (home / "Library/LaunchAgents/com.fosghen.agent-retro.plist").read_bytes()
+    )
+    assert plist["EnvironmentVariables"] == {
+        "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+        "HTTPS_PROXY": "http://127.0.0.1:8120",
+    }
+
+
+def test_install_without_proxy_keeps_path_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name in PROXY_VARIABLES:
+        monkeypatch.delenv(name, raising=False)
+    home = tmp_path / "home"
+
+    install(repository(tmp_path), home, lambda _command: 0)
+
+    plist = plistlib.loads(
+        (home / "Library/LaunchAgents/com.fosghen.agent-retro.plist").read_bytes()
+    )
+    assert plist["EnvironmentVariables"] == {
+        "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+    }
 
 
 def test_upgrade_rejects_drift_before_replacing_links(tmp_path: Path) -> None:
