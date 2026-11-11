@@ -93,6 +93,8 @@ def install(root: Path, home: Path, execute: Execute) -> None:
     script = root / "scripts/daily_codex_retro.py"
     _link(home / ".codex/skills/agent-retro", root)
     _link(home / ".local/bin/agent-retro", cli)
+    logs = home / ".codex/logs"
+    logs.mkdir(parents=True, exist_ok=True)
     plist = home / f"Library/LaunchAgents/{LABEL}.plist"
     plist.parent.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -101,6 +103,8 @@ def install(root: Path, home: Path, execute: Execute) -> None:
         "StartCalendarInterval": {"Hour": 9, "Minute": 0},
         "ProcessType": "Background",
         "EnvironmentVariables": _environment(),
+        "StandardOutPath": str(logs / "daily-retro.log"),
+        "StandardErrorPath": str(logs / "daily-retro.error.log"),
     }
     plist.write_bytes(plistlib.dumps(payload))
     execute(("launchctl", "bootout", f"{_domain()}/{LABEL}"))
