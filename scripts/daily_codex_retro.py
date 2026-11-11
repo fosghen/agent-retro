@@ -3,12 +3,18 @@
 
 from __future__ import annotations
 
+import argparse
 import shutil
 
 # Only the resolved Codex executable is invoked; arguments are not shell-evaluated.
 import subprocess  # nosec B404
+import sys
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 def session_dir(home: Path, day: date) -> Path:
@@ -46,10 +52,16 @@ def command(home: Path, day: date, report: Path) -> list[str]:
     ]
 
 
-def main() -> int:
-    """Write yesterday's retrospective when session files exist."""
-    home = Path.home()
-    day = datetime.now(tz=UTC).astimezone().date() - timedelta(days=1)
+def parse_day(argv: Sequence[str], today: date) -> date:
+    """Select an exact backfill day, defaulting to yesterday."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--date", type=date.fromisoformat)
+    arguments = parser.parse_args(argv)
+    return arguments.date or today - timedelta(days=1)
+
+
+def run_day(home: Path, day: date) -> int:
+    """Write one selected day's retrospective when session files exist."""
     source = session_dir(home, day)
     if not any(source.glob("*.jsonl")):
         return 0
@@ -60,6 +72,12 @@ def main() -> int:
         command(home, day, report), check=True
     )
     return 0
+
+
+def main() -> int:
+    """Write the requested retrospective, defaulting to yesterday."""
+    today = datetime.now(tz=UTC).astimezone().date()
+    return run_day(Path.home(), parse_day(sys.argv[1:], today))
 
 
 if __name__ == "__main__":
