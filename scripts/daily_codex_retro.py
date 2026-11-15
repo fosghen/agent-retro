@@ -12,6 +12,7 @@ import subprocess  # nosec B404
 import sys
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -90,9 +91,12 @@ def run_day(home: Path, day: date) -> int:
     reports = home / ".codex" / "worklog" / "retros"
     reports.mkdir(parents=True, exist_ok=True)
     report = reports / f"{day.isoformat()}-daily.md"
-    subprocess.run(  # noqa: S603  # nosec B603
-        command(home, day, report, sessions), check=True
-    )
+    with TemporaryDirectory(dir=reports) as temporary:
+        candidate = Path(temporary) / report.name
+        subprocess.run(  # noqa: S603  # nosec B603
+            command(home, day, candidate, sessions), check=True
+        )
+        candidate.replace(report)
     return 0
 
 

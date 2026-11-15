@@ -1,3 +1,4 @@
+import subprocess
 import unittest
 from datetime import date
 from pathlib import Path
@@ -8,6 +9,13 @@ from scripts.daily_codex_retro import activity_files, command, parse_day, run_da
 
 
 class DailyCodexRetroTests(unittest.TestCase):
+    def active_home(self, temporary: str) -> Path:
+        home = Path(temporary)
+        source = session_dir(home, date(2026, 11, 6))
+        source.mkdir(parents=True)
+        (source / "session.jsonl").write_text('{"timestamp":"2026-11-06T12:00:00+00:00"}\n')
+        return home
+
     def test_session_directory_uses_codex_date_partition(self) -> None:
         path = session_dir(Path("/home/test"), date(2026, 11, 2))
         self.assertEqual(path, Path("/home/test/.codex/sessions/2026/11/02"))
@@ -64,21 +72,41 @@ class DailyCodexRetroTests(unittest.TestCase):
 
     def test_run_day_uses_selected_date_for_report(self) -> None:
         with TemporaryDirectory() as temporary:
-            home = Path(temporary)
-            source = session_dir(home, date(2026, 11, 6))
-            source.mkdir(parents=True)
-            (source / "session.jsonl").write_text('{"timestamp":"2026-11-06T12:00:00+00:00"}\n')
+            home = self.active_home(temporary)
+
+            def complete(arguments: list[str], *, check: bool) -> None:
+                self.assertTrue(check)
+                output = Path(arguments[arguments.index("--output-last-message") + 1])
+                output.write_text("fresh report\n")
+
             with (
-                patch("scripts.daily_codex_retro.command", return_value=["codex"]) as build,
-                patch("scripts.daily_codex_retro.subprocess.run") as execute,
+                patch("scripts.daily_codex_retro.shutil.which", return_value="/bin/codex"),
+                patch("scripts.daily_codex_retro.subprocess.run", side_effect=complete),
             ):
                 self.assertEqual(run_day(home, date(2026, 11, 6)), 0)
             report = home / ".codex/worklog/retros/2026-11-06-daily.md"
-            build.assert_called_once_with(
-                home, date(2026, 11, 6), report, (source / "session.jsonl",)
-            )
-            execute.assert_called_once_with(["codex"], check=True)
-            self.assertTrue(report.parent.is_dir())
+            self.assertEqual(report.read_text(), "fresh report\n")
+
+    def test_failed_run_preserves_existing_report(self) -> None:
+        with TemporaryDirectory() as temporary:
+            home = self.active_home(temporary)
+            report = home / ".codex/worklog/retros/2026-11-06-daily.md"
+            report.parent.mkdir(parents=True)
+            report.write_text("previous\n")
+
+            def fail(arguments: list[str], *, check: bool) -> None:
+                self.assertTrue(check)
+                output = Path(arguments[arguments.index("--output-last-message") + 1])
+                output.write_text("")
+                raise subprocess.CalledProcessError(1, arguments)
+
+            with (
+                patch("scripts.daily_codex_retro.shutil.which", return_value="/bin/codex"),
+                patch("scripts.daily_codex_retro.subprocess.run", side_effect=fail),
+                self.assertRaises(subprocess.CalledProcessError),
+            ):
+                run_day(home, date(2026, 11, 6))
+            self.assertEqual(report.read_text(), "previous\n")
 
 
 if __name__ == "__main__":
