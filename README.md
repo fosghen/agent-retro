@@ -98,7 +98,9 @@ The skill will:
 ### Daily Codex retrospective on macOS
 
 The supported installation registers a LaunchAgent that runs at 09:00 local
-time and analyzes only the previous day's Codex sessions.
+time and analyzes records from the previous local calendar day, including
+continued sessions stored in earlier date partitions. Reports replace their
+destination atomically only after Codex returns non-empty output.
 The background Codex process uses GPT-6 Luna at medium reasoning in a read-only
 sandbox and writes its final
 Markdown report to `~/.codex/worklog/retros/YYYY-MM-DD-daily.md`. Scheduler logs
