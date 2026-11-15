@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 
 # Only the resolved Codex executable is invoked; arguments are not shell-evaluated.
@@ -22,15 +23,36 @@ def session_dir(home: Path, day: date) -> Path:
     return home / ".codex" / "sessions" / day.strftime("%Y/%m/%d")
 
 
-def command(home: Path, day: date, report: Path) -> list[str]:
+def activity_files(home: Path, day: date) -> tuple[Path, ...]:
+    """Find transcripts containing records on one local calendar day."""
+    root = home / ".codex" / "sessions"
+    matches: list[Path] = []
+    for path in sorted(root.rglob("*.jsonl")):
+        with path.open(encoding="utf-8", errors="replace") as stream:
+            for line in stream:
+                try:
+                    value = json.loads(line).get("timestamp")
+                    moment = datetime.fromisoformat(value)
+                except (AttributeError, TypeError, ValueError, json.JSONDecodeError):
+                    continue
+                if moment.tzinfo is not None and moment.astimezone().date() == day:
+                    matches.append(path)
+                    break
+    return tuple(matches)
+
+
+def command(home: Path, day: date, report: Path, sessions: Sequence[Path]) -> list[str]:
     """Build the non-interactive, read-only Codex invocation."""
     codex = shutil.which("codex")
     if codex is None:
         message = "codex CLI is unavailable"
         raise RuntimeError(message)
+    paths = "\n".join(f"- {path}" for path in sessions)
     prompt = (
-        "Use the agent-retro skill to analyze only Codex sessions from "
-        f"{session_dir(home, day)}. Identify repeated workflows and propose the "
+        "Use the agent-retro skill to analyze only records timestamped on local "
+        f"calendar day {day.isoformat()} in these candidate transcripts:\n{paths}\n"
+        "Deduplicate overlapping rollout files by session_id. Ignore records from "
+        "other days. Identify repeated workflows and propose the "
         "smallest reusable skill or tool improvements. Do not modify any files. "
         "Return a concise Markdown report with evidence and no transcript excerpts."
     )
@@ -62,14 +84,14 @@ def parse_day(argv: Sequence[str], today: date) -> date:
 
 def run_day(home: Path, day: date) -> int:
     """Write one selected day's retrospective when session files exist."""
-    source = session_dir(home, day)
-    if not any(source.glob("*.jsonl")):
+    sessions = activity_files(home, day)
+    if not sessions:
         return 0
     reports = home / ".codex" / "worklog" / "retros"
     reports.mkdir(parents=True, exist_ok=True)
     report = reports / f"{day.isoformat()}-daily.md"
     subprocess.run(  # noqa: S603  # nosec B603
-        command(home, day, report), check=True
+        command(home, day, report, sessions), check=True
     )
     return 0
 

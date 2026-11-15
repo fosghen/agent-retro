@@ -4,7 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from scripts.daily_codex_retro import command, parse_day, run_day, session_dir
+from scripts.daily_codex_retro import activity_files, command, parse_day, run_day, session_dir
 
 
 class DailyCodexRetroTests(unittest.TestCase):
@@ -15,14 +15,33 @@ class DailyCodexRetroTests(unittest.TestCase):
     def test_command_is_read_only_and_writes_requested_report(self) -> None:
         report = Path("/reports/retro.md")
         with patch("scripts.daily_codex_retro.shutil.which", return_value="/bin/codex"):
-            result = command(Path("/home/test"), date(2026, 11, 2), report)
+            result = command(
+                Path("/home/test"), date(2026, 11, 2), report, (Path("/sessions/a.jsonl"),)
+            )
         self.assertEqual(result[0:2], ["/bin/codex", "exec"])
         self.assertIn("gpt-6-luna", result)
         self.assertIn('model_reasoning_effort="medium"', result)
         self.assertIn("read-only", result)
         self.assertIn(str(report), result)
-        self.assertIn("2026/11/02", result[-1])
+        self.assertIn("2026-11-02", result[-1])
+        self.assertIn("/sessions/a.jsonl", result[-1])
+        self.assertIn("session_id", result[-1])
         self.assertIn("Do not modify any files", result[-1])
+
+    def test_activity_files_follow_events_across_date_partitions(self) -> None:
+        with TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            previous = session_dir(home, date(2026, 11, 12))
+            previous.mkdir(parents=True)
+            active = previous / "continued.jsonl"
+            active.write_text(
+                '{"timestamp":"2026-11-12T23:59:59+00:00"}\n'
+                '{"timestamp":"2026-11-13T12:00:00+00:00"}\n'
+            )
+            inactive = previous / "inactive.jsonl"
+            inactive.write_text('{"timestamp":"2026-11-12T12:00:00+00:00"}\n')
+
+            self.assertEqual(activity_files(home, date(2026, 11, 13)), (active,))
 
     def test_parse_day_defaults_to_yesterday(self) -> None:
         self.assertEqual(parse_day([], date(2026, 11, 11)), date(2026, 11, 10))
@@ -48,14 +67,16 @@ class DailyCodexRetroTests(unittest.TestCase):
             home = Path(temporary)
             source = session_dir(home, date(2026, 11, 6))
             source.mkdir(parents=True)
-            (source / "session.jsonl").touch()
+            (source / "session.jsonl").write_text('{"timestamp":"2026-11-06T12:00:00+00:00"}\n')
             with (
                 patch("scripts.daily_codex_retro.command", return_value=["codex"]) as build,
                 patch("scripts.daily_codex_retro.subprocess.run") as execute,
             ):
                 self.assertEqual(run_day(home, date(2026, 11, 6)), 0)
             report = home / ".codex/worklog/retros/2026-11-06-daily.md"
-            build.assert_called_once_with(home, date(2026, 11, 6), report)
+            build.assert_called_once_with(
+                home, date(2026, 11, 6), report, (source / "session.jsonl",)
+            )
             execute.assert_called_once_with(["codex"], check=True)
             self.assertTrue(report.parent.is_dir())
 
