@@ -96,6 +96,9 @@ def run_day(home: Path, day: date) -> int:
         subprocess.run(  # noqa: S603  # nosec B603
             command(home, day, candidate, sessions), check=True
         )
+        if not candidate.is_file() or not candidate.read_text().strip():
+            message = "Codex returned an empty report"
+            raise RuntimeError(message)
         candidate.replace(report)
     return 0
 

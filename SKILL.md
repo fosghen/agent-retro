@@ -52,6 +52,14 @@ This returns session_id, cwd, git_branch, first_prompt, timestamps, and file siz
 
 If it doesn't match, try the next most recent file. If none match, state this in the retro output — analyzing the wrong session is worse than no analysis.
 
+### Analyze a calendar day
+
+For a date-bounded retrospective, select records by their local event timestamp
+across the complete Codex session tree. Session directories identify when a
+session started, so a directory named for the target day can omit continued
+sessions. Deduplicate overlapping rollout files by `session_id` before comparing
+workflows.
+
 ### Run extraction
 
 ```bash

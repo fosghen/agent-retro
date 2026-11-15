@@ -108,6 +108,26 @@ class DailyCodexRetroTests(unittest.TestCase):
                 run_day(home, date(2026, 11, 6))
             self.assertEqual(report.read_text(), "previous\n")
 
+    def test_empty_success_preserves_existing_report(self) -> None:
+        with TemporaryDirectory() as temporary:
+            home = self.active_home(temporary)
+            report = home / ".codex/worklog/retros/2026-11-06-daily.md"
+            report.parent.mkdir(parents=True)
+            report.write_text("previous\n")
+
+            def empty(arguments: list[str], *, check: bool) -> None:
+                self.assertTrue(check)
+                output = Path(arguments[arguments.index("--output-last-message") + 1])
+                output.write_text(" \n")
+
+            with (
+                patch("scripts.daily_codex_retro.shutil.which", return_value="/bin/codex"),
+                patch("scripts.daily_codex_retro.subprocess.run", side_effect=empty),
+                self.assertRaisesRegex(RuntimeError, "empty report"),
+            ):
+                run_day(home, date(2026, 11, 6))
+            self.assertEqual(report.read_text(), "previous\n")
+
 
 if __name__ == "__main__":
     unittest.main()
